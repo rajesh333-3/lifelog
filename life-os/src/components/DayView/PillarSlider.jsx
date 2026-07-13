@@ -6,56 +6,67 @@ export function PillarSlider({ icon, label, color, value, note, onValue, onNote 
   const trackBg = `linear-gradient(to right, ${color} ${value}%, #1e1e1e ${value}%)`
 
   return (
-    <div className="bg-[#111] border border-[#1e1e1e] rounded-xl overflow-hidden">
-      {/* Header row */}
-      <div className="flex items-center gap-3 px-4 pt-3.5 pb-2">
-        <span className="text-base">{icon}</span>
+    <div
+      className="rounded-2xl overflow-hidden transition-all"
+      style={{ background: '#141414', border: '1px solid #242424' }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+        <span className="text-lg shrink-0">{icon}</span>
         <span className="text-[#888] text-sm font-medium flex-1">{label}</span>
-        <span className="text-lg font-light tabular-nums" style={{ color }}>{value}</span>
+        <span
+          className="text-2xl font-light tabular-nums"
+          style={{ color, letterSpacing: '-1px', lineHeight: 1 }}
+        >
+          {value}
+        </span>
       </div>
 
       {/* Slider */}
-      <div className="px-4 pb-3">
+      <div className="px-4 pb-3.5">
         <input
           type="range"
           min={0} max={100} value={value}
           onChange={e => onValue(Number(e.target.value))}
           className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-          style={{
-            background: trackBg,
-            WebkitAppearance: 'none',
-            accentColor: color,
-          }}
+          style={{ background: trackBg, accentColor: color }}
         />
-        <div className="flex justify-between mt-1">
-          <span className="text-[9px] text-[#2a2a2a]">0</span>
-          <span className="text-[9px] text-[#2a2a2a]">100</span>
+        <div className="flex justify-between mt-1.5">
+          <span className="text-[9px] font-medium text-[#2e2e2e]">0</span>
+          <span className="text-[9px] font-medium text-[#2e2e2e]">100</span>
         </div>
       </div>
 
       {/* Note toggle */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center gap-2 px-4 py-2.5 border-t border-[#1a1a1a] text-left active:opacity-70"
+        className="w-full flex items-center gap-2.5 px-4 py-3 text-left active:opacity-70 transition-opacity"
+        style={{ borderTop: '1px solid #1e1e1e' }}
       >
-        <span className="text-[#333] text-[10px] uppercase tracking-widest flex-1">
-          {note ? 'Note  ·  ' + note.slice(0, 32) + (note.length > 32 ? '…' : '') : 'Add note…'}
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, opacity: 0.4 }}>
+          <path d="M1 2h10M1 5.5h7M1 9h5" stroke="#888" strokeWidth="1.4" strokeLinecap="round"/>
+        </svg>
+        <span className="text-[11px] text-[#3a3a3a] flex-1 truncate">
+          {note ? note.slice(0, 40) + (note.length > 40 ? '…' : '') : `Add a note…`}
         </span>
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
-          style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+        <svg
+          width="12" height="12" viewBox="0 0 12 12" fill="none"
+          style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}
+        >
           <path d="M2 4l4 4 4-4" stroke="#333" strokeWidth="1.5" strokeLinecap="round"/>
         </svg>
       </button>
 
       {expanded && (
-        <div className="px-4 pb-3 border-t border-[#1a1a1a]">
+        <div style={{ borderTop: '1px solid #1e1e1e' }}>
           <textarea
             autoFocus
             value={note}
             onChange={e => onNote(e.target.value)}
             placeholder={`${label} notes for today…`}
             rows={3}
-            className="w-full bg-transparent text-[#f0f0f0] text-sm placeholder:text-[#2a2a2a] resize-none focus:outline-none leading-relaxed pt-2"
+            className="w-full bg-transparent text-[#d0d0d0] text-sm px-4 py-3.5 placeholder:text-[#2e2e2e] resize-none focus:outline-none leading-relaxed"
+            style={{ minHeight: 80 }}
           />
         </div>
       )}

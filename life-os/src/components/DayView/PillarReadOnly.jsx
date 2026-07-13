@@ -1,25 +1,23 @@
 export function PillarReadOnly({ icon, label, color, value, note }) {
   const pct = value ?? 0
   return (
-    <div className="bg-[#111] border border-[#1e1e1e] rounded-xl px-4 py-3.5">
-      <div className="flex items-center justify-between mb-2.5">
-        <div className="flex items-center gap-2">
-          <span className="text-base">{icon}</span>
+    <div className="rounded-2xl px-4 py-4" style={{ background: '#141414', border: '1px solid #242424' }}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2.5">
+          <span className="text-lg">{icon}</span>
           <span className="text-[#888] text-sm font-medium">{label}</span>
         </div>
-        <span className="text-lg font-light tabular-nums" style={{ color }}>{value ?? '—'}</span>
+        <span className="text-2xl font-light tabular-nums" style={{ color, letterSpacing: '-1px', lineHeight: 1 }}>
+          {value ?? '—'}
+        </span>
       </div>
 
-      {/* Static fill bar */}
-      <div className="h-1.5 rounded-full bg-[#1e1e1e] overflow-hidden">
-        <div
-          className="h-full rounded-full transition-none"
-          style={{ width: `${pct}%`, background: color, opacity: 0.7 }}
-        />
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#1e1e1e' }}>
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color, opacity: 0.65 }} />
       </div>
 
       {note && (
-        <p className="text-[#555] text-xs leading-relaxed mt-2.5">{note}</p>
+        <p className="text-[#555] text-xs leading-relaxed mt-3">{note}</p>
       )}
     </div>
   )

@@ -44,14 +44,16 @@ export function Settings() {
       </div>
 
       {/* Section content */}
-      <div className="flex-1 overflow-y-auto no-scrollbar px-4 py-4">
-        <AnimatePresence mode="wait">
-          {section === 'profile'   && <ProfileSection   key="profile"   />}
-          {section === 'ai'        && <AISection        key="ai"        />}
-          {section === 'pillars'   && <PillarsSection   key="pillars"   />}
-          {section === 'habits'    && <HabitsSettings   key="habits"    />}
-          {section === 'reminders' && <RemindersSection key="reminders" />}
-        </AnimatePresence>
+      <div className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="max-w-lg mx-auto px-4 py-5">
+          <AnimatePresence mode="wait">
+            {section === 'profile'   && <ProfileSection   key="profile"   />}
+            {section === 'ai'        && <AISection        key="ai"        />}
+            {section === 'pillars'   && <PillarsSection   key="pillars"   />}
+            {section === 'habits'    && <HabitsSettings   key="habits"    />}
+            {section === 'reminders' && <RemindersSection key="reminders" />}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   )
@@ -75,7 +77,7 @@ function Section({ children }) {
 /* ── Card wrapper ── */
 function Card({ children, className = '' }) {
   return (
-    <div className={`bg-[#111] border border-[#1e1e1e] rounded-2xl overflow-hidden ${className}`}>
+    <div className={`rounded-2xl overflow-hidden ${className}`} style={{ background: '#141414', border: '1px solid #242424' }}>
       {children}
     </div>
   )
@@ -83,7 +85,7 @@ function Card({ children, className = '' }) {
 
 function CardRow({ label, children }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#1a1a1a] last:border-0">
+    <div className="flex items-center gap-3 px-4 py-3.5 last:border-0" style={{ borderBottom: '1px solid #1e1e1e' }}>
       <span className="text-[#555] text-xs w-24 shrink-0">{label}</span>
       <div className="flex-1 flex justify-end">{children}</div>
     </div>
@@ -100,7 +102,10 @@ function Field({ value, onChange, type = 'text', placeholder, min, max }) {
       placeholder={placeholder}
       min={min}
       max={max}
-      className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-[#f0f0f0] text-right placeholder:text-[#333] focus:outline-none focus:border-[#a78bfa] w-full transition-colors"
+      className="rounded-xl px-3 py-2.5 text-sm text-[#e0e0e0] text-right placeholder:text-[#383838] focus:outline-none w-full transition-colors"
+      style={{ background: '#1c1c1c', border: '1px solid #2e2e2e' }}
+      onFocus={e => e.target.style.borderColor = 'rgba(167,139,250,0.5)'}
+      onBlur={e => e.target.style.borderColor = '#2e2e2e'}
     />
   )
 }
@@ -233,7 +238,10 @@ function AISection() {
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
               placeholder="AIza…"
-              className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-[#f0f0f0] text-right placeholder:text-[#333] focus:outline-none focus:border-[#a78bfa] w-full transition-colors"
+              className="rounded-xl px-3 py-2.5 text-sm text-[#e0e0e0] text-right placeholder:text-[#383838] focus:outline-none w-full transition-colors"
+      style={{ background: '#1c1c1c', border: '1px solid #2e2e2e' }}
+      onFocus={e => e.target.style.borderColor = 'rgba(167,139,250,0.5)'}
+      onBlur={e => e.target.style.borderColor = '#2e2e2e'}
             />
           </CardRow>
         </Card>

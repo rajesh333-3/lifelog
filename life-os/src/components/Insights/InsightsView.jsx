@@ -136,7 +136,7 @@ function StatsView({ period, onPeriodChange }) {
 
   return (
     <div className="flex-1 overflow-y-auto no-scrollbar">
-      <div className="px-4 pt-4 pb-6 flex flex-col gap-5">
+      <div className="max-w-lg mx-auto px-4 pt-4 pb-6 flex flex-col gap-5">
 
         {/* Header + period picker */}
         <div className="flex items-start justify-between gap-3">

@@ -60,8 +60,17 @@ export function DayView({ initialDate, asOverlay = false }) {
   const persist = useCallback(async (patch) => {
     setSaveState('saving')
     clearTimeout(saveStateTimer.current)
-    const base    = (await db.days.get(date)) ?? { date, weekId: date.slice(0, 7) }
-    const merged  = { ...base, ...patch }
+    const base   = (await db.days.get(date)) ?? { date, weekId: date.slice(0, 7) }
+    const merged = { ...base, ...patch }
+
+    // If the day has no meaningful data, remove it rather than storing blank defaults
+    if (isDayEmpty(merged)) {
+      await db.days.delete(date)
+      setSaveState('saved')
+      saveStateTimer.current = setTimeout(() => setSaveState('idle'), 2200)
+      return
+    }
+
     const overall = overallScore(merged.physical, merged.mental, merged.work)
     merged.overallScore = overall
     merged.color        = merged.lifeEvent ? '#60a5fa' : scoreToColor(overall)
@@ -69,6 +78,12 @@ export function DayView({ initialDate, asOverlay = false }) {
     setSaveState('saved')
     saveStateTimer.current = setTimeout(() => setSaveState('idle'), 2200)
   }, [date])
+
+  async function resetDay() {
+    clearTimeout(saveTimer.current)
+    await db.days.delete(date)
+    setLocal(emptyDay())
+  }
 
   // Debounced auto-save for text inputs only
   function autoSave(next) {
@@ -109,14 +124,29 @@ export function DayView({ initialDate, asOverlay = false }) {
     >
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a] shrink-0">
-        <button
-          onClick={closePanel ?? undefined}
-          className={`w-9 h-9 rounded-full bg-[#1a1a1a] flex items-center justify-center active:scale-95 ${!closePanel ? 'invisible' : ''}`}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M10 3L5 8l5 5" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={closePanel ?? undefined}
+            className={`w-9 h-9 rounded-full bg-[#1a1a1a] flex items-center justify-center active:scale-95 ${!closePanel ? 'invisible' : ''}`}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M10 3L5 8l5 5" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+
+          {/* Reset day — only shown when the day has saved data */}
+          {!isFut && dayData && (
+            <button
+              onClick={resetDay}
+              className="w-9 h-9 rounded-full bg-[#1a1a1a] flex items-center justify-center active:scale-95 transition-colors"
+              title="Reset day"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 4h10M5 4V3a1 1 0 011-1h2a1 1 0 011 1v1M11 4l-.6 7a1 1 0 01-1 .9H4.6a1 1 0 01-1-.9L3 4" stroke="#555" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
 
         {/* Date nav */}
         <div className="flex items-center gap-2">
@@ -170,131 +200,134 @@ export function DayView({ initialDate, asOverlay = false }) {
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="max-w-lg mx-auto">
 
-        {/* ── FUTURE mode ── */}
-        {isFut && (
-          <div className="px-4 pt-3 pb-6 flex flex-col gap-3">
-            <FutureNotice />
-            <Section title="Schedule">
-              <TaskSection date={date} futureOnly />
-            </Section>
-          </div>
-        )}
-
-        {/* ── PAST mode ── */}
-        {isPast && (
-          <div className="px-4 pt-3 pb-6 flex flex-col gap-3">
-            <PastNotice />
-
-            {dayData ? (
-              <Section title="Your Day">
-                <div className="flex flex-col gap-2.5">
-                  <PillarReadOnly icon="💪" label="Physical" color="#4ade80"
-                    value={local.physical} note={local.physicalNote} />
-                  <PillarReadOnly icon="🧠" label="Mental"   color="#60a5fa"
-                    value={local.mental}   note={local.mentalNote}   />
-                  <PillarReadOnly icon="💼" label="Work"     color="#fbbf24"
-                    value={local.work}     note={local.workNote}     />
-                </div>
+          {/* ── FUTURE mode ── */}
+          {isFut && (
+            <div className="px-4 pt-5 pb-10 flex flex-col gap-5">
+              <FutureNotice />
+              <Section title="Schedule">
+                <TaskSection date={date} futureOnly />
               </Section>
-            ) : (
-              <Section title="Your Day">
-                <p className="text-[#555] text-sm">No data logged for this day.</p>
+            </div>
+          )}
+
+          {/* ── PAST mode ── */}
+          {isPast && (
+            <div className="px-4 pt-5 pb-10 flex flex-col gap-5">
+              <PastNotice />
+
+              {dayData ? (
+                <Section title="Your Day">
+                  <div className="flex flex-col gap-2.5">
+                    <PillarReadOnly icon="💪" label="Physical" color="#4ade80"
+                      value={local.physical} note={local.physicalNote} />
+                    <PillarReadOnly icon="🧠" label="Mental"   color="#60a5fa"
+                      value={local.mental}   note={local.mentalNote}   />
+                    <PillarReadOnly icon="💼" label="Work"     color="#fbbf24"
+                      value={local.work}     note={local.workNote}     />
+                  </div>
+                </Section>
+              ) : (
+                <Section title="Your Day">
+                  <p className="text-[#444] text-sm">No data logged for this day.</p>
+                </Section>
+              )}
+
+              {(local.wentWell || local.couldBeBetter) && (
+                <Section title="Reflection">
+                  <div className="flex flex-col gap-2.5">
+                    {local.wentWell && (
+                      <ReadOnlyCard label="✦  What went well" text={local.wentWell} />
+                    )}
+                    {local.couldBeBetter && (
+                      <ReadOnlyCard label="↺  Could be better" text={local.couldBeBetter} />
+                    )}
+                  </div>
+                </Section>
+              )}
+
+              {local.voiceNote && (
+                <Section title="Voice Journal">
+                  <ReadOnlyCard label="🎙 Voice note" text={local.voiceNote} />
+                </Section>
+              )}
+
+              <Section title="Tasks">
+                <TaskSection date={date} readOnly />
               </Section>
-            )}
 
-            {(local.wentWell || local.couldBeBetter) && (
-              <Section title="Reflection">
-                <div className="flex flex-col gap-2">
-                  {local.wentWell && (
-                    <ReadOnlyCard label="✦  What went well" text={local.wentWell} />
-                  )}
-                  {local.couldBeBetter && (
-                    <ReadOnlyCard label="↺  Could be better" text={local.couldBeBetter} />
-                  )}
-                </div>
+              <Section title="Habits">
+                <HabitsSection date={date} readOnly />
               </Section>
-            )}
 
-            {local.voiceNote && (
-              <Section title="Voice Journal">
-                <ReadOnlyCard label="🎙 Voice note" text={local.voiceNote} />
-              </Section>
-            )}
-
-            <Section title="Tasks">
-              <TaskSection date={date} readOnly />
-            </Section>
-
-            <Section title="Habits">
-              <HabitsSection date={date} readOnly />
-            </Section>
-
-            <LifeEventSection
-              value={local.lifeEvent}
-              note={local.lifeEventNote}
-              onToggle={v => saveNow({ ...local, lifeEvent: v })}
-              onNote={v => update('lifeEventNote', v)}
-            />
-          </div>
-        )}
-
-        {/* ── TODAY mode ── */}
-        {isTod && (
-          <div className="px-4 pt-3 pb-6 flex flex-col gap-3">
-            <Section title="Pillars">
-              <div className="flex flex-col gap-3">
-                <PillarSlider icon="💪" label="Physical" color="#4ade80"
-                  value={local.physical}     note={local.physicalNote}
-                  onValue={v => update('physical', v)}
-                  onNote={v => update('physicalNote', v)} />
-                <PillarSlider icon="🧠" label="Mental"   color="#60a5fa"
-                  value={local.mental}       note={local.mentalNote}
-                  onValue={v => update('mental', v)}
-                  onNote={v => update('mentalNote', v)} />
-                <PillarSlider icon="💼" label="Work"     color="#fbbf24"
-                  value={local.work}         note={local.workNote}
-                  onValue={v => update('work', v)}
-                  onNote={v => update('workNote', v)} />
-              </div>
-            </Section>
-
-            <Section title="Reflection">
-              <div className="grid grid-cols-2 gap-2">
-                <ReflectField label="✦  Went well"    value={local.wentWell}
-                  onChange={v => update('wentWell', v)}      placeholder="A win, however small…" />
-                <ReflectField label="↺  Improve"   value={local.couldBeBetter}
-                  onChange={v => update('couldBeBetter', v)} placeholder="One thing to work on…" />
-              </div>
-            </Section>
-
-            <Section title="Voice Journal">
-              <VoiceJournal
-                value={local.voiceNote}
-                onChange={v => update('voiceNote', v)}
+              <LifeEventSection
+                value={local.lifeEvent}
+                note={local.lifeEventNote}
+                onToggle={v => saveNow({ ...local, lifeEvent: v })}
+                onNote={v => update('lifeEventNote', v)}
               />
-            </Section>
+            </div>
+          )}
 
-            <Section title="Tasks">
-              <TaskSection date={date} />
-            </Section>
+          {/* ── TODAY mode ── */}
+          {isTod && (
+            <div className="px-4 pt-5 pb-10 flex flex-col gap-5">
+              <Section title="Pillars">
+                <div className="flex flex-col gap-3">
+                  <PillarSlider icon="💪" label="Physical" color="#4ade80"
+                    value={local.physical}     note={local.physicalNote}
+                    onValue={v => update('physical', v)}
+                    onNote={v => update('physicalNote', v)} />
+                  <PillarSlider icon="🧠" label="Mental"   color="#60a5fa"
+                    value={local.mental}       note={local.mentalNote}
+                    onValue={v => update('mental', v)}
+                    onNote={v => update('mentalNote', v)} />
+                  <PillarSlider icon="💼" label="Work"     color="#fbbf24"
+                    value={local.work}         note={local.workNote}
+                    onValue={v => update('work', v)}
+                    onNote={v => update('workNote', v)} />
+                </div>
+              </Section>
 
-            <Section title="Habits">
-              <HabitsSection date={date} />
-            </Section>
+              <Section title="Reflection">
+                <div className="flex flex-col gap-2.5">
+                  <ReflectField label="✦  What went well"   value={local.wentWell}
+                    onChange={v => update('wentWell', v)}      placeholder="A win, however small…" />
+                  <ReflectField label="↺  Could be better" value={local.couldBeBetter}
+                    onChange={v => update('couldBeBetter', v)} placeholder="One thing to work on…" />
+                </div>
+              </Section>
 
-            <Section title="Hobbies">
-              <HobbySection date={date} />
-            </Section>
+              <Section title="Voice Journal">
+                <VoiceJournal
+                  value={local.voiceNote}
+                  onChange={v => update('voiceNote', v)}
+                />
+              </Section>
 
-            <LifeEventSection
-              value={local.lifeEvent}
-              note={local.lifeEventNote}
-              onToggle={v => saveNow({ ...local, lifeEvent: v })}
-              onNote={v => update('lifeEventNote', v)}
-            />
-          </div>
-        )}
+              <Section title="Tasks">
+                <TaskSection date={date} />
+              </Section>
+
+              <Section title="Habits">
+                <HabitsSection date={date} />
+              </Section>
+
+              <Section title="Hobbies">
+                <HobbySection date={date} />
+              </Section>
+
+              <LifeEventSection
+                value={local.lifeEvent}
+                note={local.lifeEventNote}
+                onToggle={v => saveNow({ ...local, lifeEvent: v })}
+                onNote={v => update('lifeEventNote', v)}
+              />
+            </div>
+          )}
+
+        </div>
       </div>
 
       {/* Auto-save indicator — subtle top-right badge, no blocking button */}
@@ -325,27 +358,27 @@ export function DayView({ initialDate, asOverlay = false }) {
 /* ── Life Event section ── */
 function LifeEventSection({ value, note, onToggle, onNote }) {
   return (
-    <Section title="Life Event" subtitle="Mark this day as a milestone — always editable">
-      <div className="bg-[#111] border rounded-xl overflow-hidden"
-        style={{ borderColor: value ? '#60a5fa33' : '#1e1e1e' }}>
+    <Section title="Life Event" subtitle="Always editable">
+      <div className="rounded-2xl overflow-hidden transition-all"
+        style={{ background: '#141414', border: `1px solid ${value ? 'rgba(96,165,250,0.25)' : '#242424'}` }}>
         <button
           onClick={() => onToggle(!value)}
-          className="w-full flex items-center justify-between px-4 py-3.5 active:opacity-70"
+          className="w-full flex items-center justify-between px-4 py-4 active:opacity-70"
         >
-          <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full" style={{ background: value ? '#60a5fa' : '#2a2a2a' }} />
-            <span className="text-sm" style={{ color: value ? '#60a5fa' : '#555' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full transition-colors" style={{ background: value ? '#60a5fa' : '#2e2e2e' }} />
+            <span className="text-sm font-medium" style={{ color: value ? '#93c5fd' : '#555' }}>
               {value ? 'Life event marked' : 'Mark as life event'}
             </span>
           </div>
           <div
-            className="w-10 h-6 rounded-full transition-colors flex items-center px-0.5"
-            style={{ background: value ? '#60a5fa33' : '#1a1a1a', border: `1px solid ${value ? '#60a5fa55' : '#2a2a2a'}` }}
+            className="w-11 h-6 rounded-full transition-all flex items-center px-0.5"
+            style={{ background: value ? 'rgba(96,165,250,0.2)' : '#1e1e1e', border: `1px solid ${value ? 'rgba(96,165,250,0.4)' : '#2e2e2e'}` }}
           >
             <motion.div
-              className="w-4 h-4 rounded-full"
-              style={{ background: value ? '#60a5fa' : '#333' }}
-              animate={{ x: value ? 16 : 0 }}
+              className="w-5 h-5 rounded-full shadow-sm"
+              style={{ background: value ? '#60a5fa' : '#383838' }}
+              animate={{ x: value ? 18 : 0 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             />
           </div>
@@ -357,15 +390,16 @@ function LifeEventSection({ value, note, onToggle, onNote }) {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="border-t overflow-hidden"
-              style={{ borderColor: '#60a5fa22' }}
+              className="overflow-hidden"
+              style={{ borderTop: '1px solid rgba(96,165,250,0.12)' }}
             >
               <textarea
                 value={note}
                 onChange={e => onNote(e.target.value)}
                 placeholder="Describe this life event…"
                 rows={3}
-                className="w-full bg-transparent px-4 py-3 text-sm text-[#f0f0f0] placeholder:text-[#2a2a2a] resize-none focus:outline-none leading-relaxed"
+                className="w-full bg-transparent px-4 py-3.5 text-sm text-[#d0d0d0] placeholder:text-[#2e2e2e] resize-none focus:outline-none leading-relaxed"
+                style={{ minHeight: 80 }}
               />
             </motion.div>
           )}
@@ -383,34 +417,51 @@ function WeekStrip({ date, dob, onSelect }) {
   const LABELS   = ['M','T','W','T','F','S','S']
 
   return (
-    <div className="flex border-b border-[#1a1a1a] shrink-0">
-      {dates.map((d, i) => {
-        const active = d === date
-        const isT    = d === today
-        const fut    = d > today
-        return (
-          <button key={d} onClick={() => onSelect(d)}
-            className="flex-1 flex flex-col items-center py-2.5 gap-1 transition-colors"
-            style={{ background: active ? '#161616' : 'transparent' }}>
-            <span className="text-[9px] uppercase tracking-widest"
-              style={{ color: isT ? '#a78bfa' : '#555' }}>{LABELS[i]}</span>
-            <span className="text-[13px] font-medium"
-              style={{ color: active ? '#f0f0f0' : fut ? '#222' : '#555' }}>
-              {new Date(d + 'T00:00:00').getDate()}
-            </span>
-            {isT && <div className="w-1 h-1 rounded-full bg-[#a78bfa]" />}
-          </button>
-        )
-      })}
+    <div className="border-b border-[#1a1a1a] shrink-0">
+      <div className="max-w-lg mx-auto flex">
+        {dates.map((d, i) => {
+          const active = d === date
+          const isT    = d === today
+          const fut    = d > today
+          return (
+            <button key={d} onClick={() => onSelect(d)}
+              className="flex-1 flex flex-col items-center py-3 gap-1 transition-colors active:bg-[#161616]"
+              style={{ background: active ? '#161616' : 'transparent' }}>
+              <span className="text-[9px] font-semibold uppercase tracking-widest"
+                style={{ color: isT ? '#a78bfa' : '#444' }}>{LABELS[i]}</span>
+              <span className="w-7 h-7 flex items-center justify-center rounded-full text-[13px] font-medium transition-all"
+                style={{
+                  background: active ? '#a78bfa' : 'transparent',
+                  color: active ? '#0a0a0a' : fut ? '#252525' : isT ? '#c4b5fd' : '#888',
+                  fontWeight: active || isT ? 600 : 400,
+                }}>
+                {new Date(d + 'T00:00:00').getDate()}
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
 /* ── Reusable section wrapper ── */
-function Section({ title, children }) {
+function Section({ title, subtitle, children }) {
   return (
-    <div>
-      <p className="text-[#777] text-[10px] uppercase tracking-widest font-medium mb-2">{title}</p>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <p style={{
+          fontFamily:    "'Inter', system-ui, sans-serif",
+          fontSize:      11,
+          fontWeight:    600,
+          letterSpacing: '0.07em',
+          textTransform: 'uppercase',
+          color:         '#484848',
+        }}>{title}</p>
+        {subtitle && (
+          <p style={{ fontSize: 10, color: '#303030', flexShrink: 0 }}>{subtitle}</p>
+        )}
+      </div>
       {children}
     </div>
   )
@@ -425,16 +476,21 @@ function ReflectField({ label, value, onChange, placeholder }) {
   }
 
   return (
-    <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-3 flex flex-col"
-      style={{ borderColor: listening ? 'rgba(167,139,250,0.3)' : '' }}>
-      <div className="flex items-center justify-between mb-1.5">
-        <p className="text-[#444] text-[9px] uppercase tracking-widest">{label}</p>
+    <div
+      className="rounded-2xl overflow-hidden transition-all"
+      style={{
+        background:  '#141414',
+        border:      `1px solid ${listening ? 'rgba(167,139,250,0.35)' : '#242424'}`,
+      }}
+    >
+      <div className="flex items-center justify-between px-4 pt-3.5 pb-1">
+        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#404040' }}>{label}</p>
         <button
           onClick={() => toggle(handleFinal)}
-          className="w-5 h-5 rounded-full flex items-center justify-center transition-all active:scale-90 shrink-0"
+          className="w-6 h-6 rounded-full flex items-center justify-center transition-all active:scale-90 shrink-0"
           style={{
-            background: listening ? 'rgba(248,113,113,0.2)' : 'transparent',
-            border:     `1px solid ${listening ? 'rgba(248,113,113,0.5)' : '#2a2a2a'}`,
+            background: listening ? 'rgba(248,113,113,0.15)' : '#1e1e1e',
+            border:     `1px solid ${listening ? 'rgba(248,113,113,0.4)' : '#2e2e2e'}`,
           }}
         >
           {listening ? (
@@ -457,10 +513,11 @@ function ReflectField({ label, value, onChange, placeholder }) {
         onChange={e => onChange(e.target.value)}
         placeholder={listening ? interim || 'Listening…' : placeholder}
         rows={3}
-        className="flex-1 w-full bg-transparent text-[#e0e0e0] text-xs placeholder:text-[#444] resize-none focus:outline-none leading-relaxed"
+        className="w-full bg-transparent text-[#d0d0d0] text-sm px-4 pb-4 pt-1 placeholder:text-[#2e2e2e] resize-none focus:outline-none leading-relaxed"
+        style={{ minHeight: 80 }}
       />
       {interim && (
-        <p className="text-[10px] text-[#555] italic mt-1">{interim}…</p>
+        <p className="px-4 pb-2 text-[11px] text-[#484848] italic">{interim}…</p>
       )}
     </div>
   )
@@ -469,9 +526,9 @@ function ReflectField({ label, value, onChange, placeholder }) {
 /* ── Read-only text card for past days ── */
 function ReadOnlyCard({ label, text }) {
   return (
-    <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-3">
-      <p className="text-[#555] text-[10px] uppercase tracking-widest mb-1.5">{label}</p>
-      <p className="text-[#888] text-sm leading-relaxed">{text}</p>
+    <div className="rounded-2xl px-4 py-4" style={{ background: '#141414', border: '1px solid #242424' }}>
+      <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#404040', marginBottom: 8 }}>{label}</p>
+      <p className="text-[#999] text-sm leading-relaxed">{text}</p>
     </div>
   )
 }
@@ -479,13 +536,17 @@ function ReadOnlyCard({ label, text }) {
 /* ── Notices ── */
 function FutureNotice() {
   return (
-    <p className="text-[#666] text-xs">Not yet — you can schedule tasks for this day.</p>
+    <div className="rounded-2xl px-4 py-3.5" style={{ background: '#141414', border: '1px solid #242424' }}>
+      <p className="text-[#484848] text-sm">Not yet — you can schedule tasks for this day.</p>
+    </div>
   )
 }
 
 function PastNotice() {
   return (
-    <p className="text-[#555] text-xs">Read only · life events still editable</p>
+    <div className="rounded-2xl px-4 py-3" style={{ background: '#141414', border: '1px solid #242424' }}>
+      <p className="text-[#484848] text-xs">Read only · life events still editable</p>
+    </div>
   )
 }
 
@@ -606,4 +667,20 @@ function emptyDay() {
     lifeEvent: false, lifeEventNote: '',
     voiceNote: '',
   }
+}
+
+function isDayEmpty(d) {
+  return (
+    !d.lifeEvent &&
+    (d.physical ?? 50) === 50 &&
+    (d.mental   ?? 50) === 50 &&
+    (d.work     ?? 50) === 50 &&
+    !d.physicalNote?.trim() &&
+    !d.mentalNote?.trim() &&
+    !d.workNote?.trim() &&
+    !d.wentWell?.trim() &&
+    !d.couldBeBetter?.trim() &&
+    !d.voiceNote?.trim() &&
+    !d.lifeEventNote?.trim()
+  )
 }
