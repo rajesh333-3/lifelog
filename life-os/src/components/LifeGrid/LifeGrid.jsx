@@ -1,5 +1,6 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { AnimatePresence } from 'framer-motion'
 import { WeekDot } from './WeekDot'
 import { WeekTooltip } from './WeekTooltip'
 import { db } from '../../db'
@@ -7,7 +8,6 @@ import { useAppStore } from '../../store/useAppStore'
 import {
   currentWeekIndex,
   totalWeeks,
-  daysCompletedThisWeek,
   weekDates,
 } from '../../utils/dateUtils'
 import { scoreToColor, overallScore } from '../../utils/scoreUtils'
@@ -15,26 +15,23 @@ import { scoreToColor, overallScore } from '../../utils/scoreUtils'
 const COLS = 52
 
 export function LifeGrid({ dob, lifeExpectancy }) {
-  const total       = totalWeeks(lifeExpectancy)
-  const currentIdx  = currentWeekIndex(dob)
-  const currentRef  = useRef(null)
-  const hoveredWeek = useAppStore(s => s.hoveredWeek)
-  const setHovered  = useAppStore(s => s.setHoveredWeek)
+  const total      = totalWeeks(lifeExpectancy)
+  const currentIdx = currentWeekIndex(dob)
+  const currentRef = useRef(null)
+  const hideTimer  = useRef(null)
   const openDayView = useAppStore(s => s.openDayView)
 
-  // All logged days so we can color lived weeks
+  const [hovered, setHovered] = useState(null) // { index, anchorEl }
+
   const allDays = useLiveQuery(() => db.days.toArray(), [])
   const dayMap  = {}
-  if (allDays) {
-    for (const d of allDays) dayMap[d.date] = d
-  }
+  if (allDays) for (const d of allDays) dayMap[d.date] = d
 
-  // Days logged this week for the current dot fill
+  // Current week fill pct
   const thisWeekDates  = weekDates(dob, currentIdx)
   const loggedThisWeek = thisWeekDates.filter(d => dayMap[d])
   const fillPct        = Math.round((loggedThisWeek.length / 7) * 100)
 
-  // Current week color from logged days
   const currentWeekColor = (() => {
     const scores = loggedThisWeek
       .map(d => dayMap[d])
@@ -45,15 +42,12 @@ export function LifeGrid({ dob, lifeExpectancy }) {
     return scoreToColor(avg)
   })()
 
-  // Scroll to current week on mount
   useEffect(() => {
-    if (currentRef.current) {
-      currentRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
+    currentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [])
 
   function getWeekColor(weekIndex) {
-    const dates = weekDates(dob, weekIndex)
+    const dates  = weekDates(dob, weekIndex)
     const logged = dates.map(d => dayMap[d]).filter(Boolean)
     if (!logged.length) return null
     const scores = logged
@@ -64,39 +58,58 @@ export function LifeGrid({ dob, lifeExpectancy }) {
     return scoreToColor(avg)
   }
 
+  const handleDotEnter = useCallback((index, el) => {
+    clearTimeout(hideTimer.current)
+    setHovered({ index, anchorEl: el })
+  }, [])
+
+  const handleDotLeave = useCallback(() => {
+    hideTimer.current = setTimeout(() => setHovered(null), 120)
+  }, [])
+
+  const handleTooltipEnter = useCallback(() => {
+    clearTimeout(hideTimer.current)
+  }, [])
+
+  const handleTooltipLeave = useCallback(() => {
+    hideTimer.current = setTimeout(() => setHovered(null), 120)
+  }, [])
+
   const rows = Math.ceil(total / COLS)
 
   return (
-    <div className="flex flex-row h-full">
-      {/* Age labels */}
-      <div
-        className="flex flex-col shrink-0 pr-2"
-        style={{ gap: 2 }}
-      >
+    <div className="flex flex-row h-full gap-1">
+      {/* Age axis */}
+      <div className="flex flex-col shrink-0 justify-start" style={{ gap: 2 }}>
         {Array.from({ length: rows }, (_, r) => (
           <div
             key={r}
-            className="flex items-center justify-end text-[#333] shrink-0"
-            style={{ height: 0, fontSize: 9, minWidth: 28 }}
+            className="flex items-center justify-end shrink-0"
+            style={{ height: 0, marginTop: r === 0 ? 4 : 0 }}
           >
-            {r % 5 === 0 ? r : ''}
+            <span
+              className="text-right leading-none"
+              style={{
+                fontSize: 8,
+                color: r % 5 === 0 ? '#3a3a3a' : 'transparent',
+                minWidth: 20,
+                paddingRight: 4,
+                userSelect: 'none',
+              }}
+            >{r}</span>
           </div>
         ))}
       </div>
 
-      {/* Grid */}
+      {/* Dot grid */}
       <div
         className="relative flex-1"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${COLS}, 1fr)`,
-          gap: 2,
-        }}
+        style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, 1fr)`, gap: 2 }}
       >
         {Array.from({ length: total }, (_, i) => {
           const isCurrent = i === currentIdx
-          const state = i < currentIdx ? 'lived' : i === currentIdx ? 'current' : 'future'
-          const color = isCurrent ? currentWeekColor : state === 'lived' ? getWeekColor(i) : null
+          const state     = i < currentIdx ? 'lived' : isCurrent ? 'current' : 'future'
+          const color     = isCurrent ? currentWeekColor : state === 'lived' ? getWeekColor(i) : null
 
           return (
             <WeekDot
@@ -107,24 +120,26 @@ export function LifeGrid({ dob, lifeExpectancy }) {
               fillPct={isCurrent ? fillPct : undefined}
               isCurrent={isCurrent}
               dotRef={isCurrent ? currentRef : undefined}
-              onClick={() => {
-                const dates = weekDates(dob, i)
-                openDayView(dates[0])
-              }}
-              onHoverStart={() => setHovered(i)}
-              onHoverEnd={() => setHovered(null)}
+              onClick={() => openDayView(weekDates(dob, i)[0])}
+              onHoverStart={(el) => handleDotEnter(i, el)}
+              onHoverEnd={handleDotLeave}
             />
           )
         })}
 
-        {/* Tooltip */}
-        {hoveredWeek != null && (
-          <WeekTooltip
-            weekIndex={hoveredWeek}
-            dob={dob}
-            dayMap={dayMap}
-          />
-        )}
+        <AnimatePresence>
+          {hovered && (
+            <WeekTooltip
+              key={hovered.index}
+              weekIndex={hovered.index}
+              dob={dob}
+              dayMap={dayMap}
+              anchorEl={hovered.anchorEl}
+              onMouseEnter={handleTooltipEnter}
+              onMouseLeave={handleTooltipLeave}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )

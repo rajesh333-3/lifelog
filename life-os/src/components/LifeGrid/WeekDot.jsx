@@ -1,43 +1,31 @@
 import { useRef } from 'react'
 
-const STATE_COLORS = {
-  lived:   '#2a2a2a',
-  future:  '#161616',
-  current: null,  // uses conic gradient
-}
+export function WeekDot({ weekIndex, state, color, fillPct, isCurrent, onClick, onHoverStart, onHoverEnd }) {
+  const ref = useRef(null)
 
-export function WeekDot({ weekIndex, state, color, fillPct, onClick, onHoverStart, onHoverEnd, isCurrent, dotRef }) {
-  const resolvedColor = color ?? (state === 'lived' ? STATE_COLORS.lived : STATE_COLORS.future)
-
-  const style = isCurrent
-    ? {
-        background: `conic-gradient(${color ?? '#a78bfa'} ${fillPct ?? 0}%, #222222 ${fillPct ?? 0}%)`,
-        '--fill-color': color ?? '#a78bfa',
-        '--fill-pct': `${fillPct ?? 0}%`,
-      }
-    : { background: resolvedColor }
+  const bg = isCurrent
+    ? `conic-gradient(${color ?? '#a78bfa'} ${fillPct ?? 0}%, #1e1e1e ${fillPct ?? 0}%)`
+    : color ?? (state === 'lived' ? '#252525' : '#141414')
 
   return (
     <div
-      ref={dotRef}
+      ref={ref}
       onClick={onClick}
-      onMouseEnter={onHoverStart}
-      onMouseLeave={onHoverEnd}
-      onTouchStart={onHoverStart}
-      onTouchEnd={onHoverEnd}
+      onMouseEnter={() => onHoverStart?.(ref.current)}
+      onMouseLeave={() => onHoverEnd?.()}
+      onTouchStart={() => onHoverStart?.(ref.current)}
+      onTouchEnd={() => onHoverEnd?.()}
       className={[
-        'rounded-sm cursor-pointer transition-transform duration-150',
-        'active:scale-110',
+        'rounded-[2px] cursor-pointer transition-all duration-100',
+        'hover:scale-[1.5] hover:z-10 active:scale-125',
         isCurrent ? 'week-current' : '',
-        state === 'lived' ? 'opacity-80' : '',
       ].join(' ')}
       style={{
         width: '100%',
         aspectRatio: '1',
-        minWidth: 6,
-        ...style,
+        background: bg,
+        opacity: state === 'future' ? 0.5 : 1,
       }}
-      aria-label={`Week ${weekIndex}`}
     />
   )
 }
