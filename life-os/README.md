@@ -9,6 +9,30 @@ Life Log is a private, offline-first personal life-tracking PWA. Every piece of 
 
 ---
 
+## Use it right now — no install needed
+
+The app is a PWA. You can install it on your home screen in seconds, no App Store required.
+
+### iPhone / iPad (Safari)
+1. Open **Safari** and go to https://exquisite-maamoul-fbc403.netlify.app
+2. Tap the **Share** button (box with arrow at the bottom of the screen)
+3. Scroll down and tap **Add to Home Screen**
+4. Tap **Add** — the app icon appears on your home screen
+5. Open it from the home screen — it runs full-screen, works offline, and feels native
+
+> Chrome on iOS does **not** support Add to Home Screen properly. Use Safari.
+
+### Android (Chrome)
+1. Open **Chrome** and go to https://exquisite-maamoul-fbc403.netlify.app
+2. Tap the **three-dot menu** (top right)
+3. Tap **Add to Home Screen** or **Install app**
+4. Tap **Install** — the app installs like a native app
+5. Open from your home screen — full-screen, offline-ready
+
+> Samsung Internet also supports this. Firefox on Android does not.
+
+---
+
 ## What's in v1
 
 ### Life Grid
@@ -35,9 +59,6 @@ Connect Ollama (local) or Gemini (cloud) in Settings → AI to unlock the weekly
 ### Welcome Tour
 A 6-slide onboarding tour shown on first launch. Replay anytime via Settings → Tour.
 
-### PWA / Installable
-Installable from the browser on iOS (Safari → Add to Home Screen) and Android (Chrome → Install app). Works fully offline after first load.
-
 ---
 
 ## Pending — Next Release
@@ -48,8 +69,58 @@ These features are visible in the UI but not yet active. A notice is shown in th
 |---|---|---|
 | **Push Notifications** | Coming next release | Reminder times can be set in Settings → Reminders but no notifications fire yet. Web Push + service worker integration pending. |
 | **Data Export & Import** | Coming next release | All data lives in IndexedDB on-device. Until export is implemented, clearing browser storage or uninstalling the app will erase all data permanently. **Back up your device regularly in the meantime.** |
-| **Native App (iOS / Android)** | Coming next release | Capacitor is configured. Packaging to `.ipa` / `.apk` and App Store submission pending. |
+| **Native App (iOS / Android)** | In progress | Capacitor projects generated. Requires Xcode / Android Studio to build. See below. |
 | **Hobbies in Insights** | Coming next release | Hobby logs are tracked per day but not yet visualised in the Insights charts. |
+
+---
+
+## Native app development (Capacitor)
+
+The `ios/` and `android/` Capacitor projects are already generated in this repo.
+
+### Prerequisites
+
+**Android**
+- [Android Studio](https://developer.android.com/studio) (includes the Android SDK and emulator)
+- Java 17+ (Android Studio bundles it)
+
+**iOS**
+- Mac with [Xcode](https://apps.apple.com/app/xcode/id497799835) installed (free, App Store)
+- CocoaPods — install via Homebrew:
+  ```bash
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  brew install cocoapods
+  ```
+- Then add the iOS platform (one-time):
+  ```bash
+  npx cap add ios
+  ```
+
+### Run on device or simulator
+
+```bash
+# 1. Build the web app
+npm run build
+
+# 2. Push web assets to native projects
+npx cap sync
+
+# 3. Open in Android Studio
+npx cap open android
+
+# 4. Open in Xcode (requires iOS setup above)
+npx cap open ios
+```
+
+In Android Studio: wait for Gradle sync → click **Run**. Select a device or emulator.  
+In Xcode: select your target device → click **Run** (▶).
+
+### Keeping native projects in sync
+
+Any time you change code, rebuild and sync:
+```bash
+npm run build && npx cap sync
+```
 
 ---
 
@@ -65,7 +136,7 @@ These features are visible in the UI but not yet active. A notice is shown in th
 | Charts | Recharts |
 | Drag & drop | @dnd-kit/core |
 | PWA | vite-plugin-pwa + Workbox |
-| Native | Capacitor (iOS + Android) |
+| Native | Capacitor 8 (iOS + Android) |
 | Fonts | Outfit + Inter (Google Fonts) |
 
 ---
@@ -102,7 +173,7 @@ Or serve with any static host — the app is entirely client-side.
 
 - [ ] Push notification reminders
 - [ ] JSON export & import (full backup/restore)
-- [ ] Capacitor iOS + Android packaging
+- [ ] Capacitor iOS + Android packaging → App Store / Play Store
 - [ ] Hobbies in Insights charts
 - [ ] iCloud / Google Drive sync (optional)
 - [ ] Lock screen widget (native only)

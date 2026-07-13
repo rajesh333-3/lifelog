@@ -1,0 +1,11 @@
+{
+  "appId": "com.rajeshtvd.lifeos",
+  "appName": "Life Log",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "ios": {
+    "contentInset": "always"
+  }
+}
