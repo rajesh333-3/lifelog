@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useSettingsStore } from '../../store/useSettingsStore'
 import { useLLM } from '../AIChat/useLLM'
 import { getHabits, saveHabits } from '../../db'
+import { NextReleaseBanner } from '../UI/NextReleaseBanner'
 
 const PILLAR_META = [
   { key: 'physical', label: 'Physical', icon: '💪', color: '#4ade80' },
@@ -181,6 +182,10 @@ function ProfileSection() {
         </CardRow>
       </Card>
       <SaveBtn onSave={save} />
+      <NextReleaseBanner
+        title="Data Export & Import"
+        description="All your logs are stored only on this device. Export and backup support is coming next release — until then, keep regular device backups to avoid data loss."
+      />
     </Section>
   )
 }
@@ -592,9 +597,10 @@ function RemindersSection() {
 
   return (
     <Section>
-      <p className="text-[#444] text-xs px-1 leading-relaxed">
-        Reminder times are stored locally. Push notification support will be added in a future phase.
-      </p>
+      <NextReleaseBanner
+        title="Push Notifications"
+        description="Set your preferred times below — they'll be saved and activated automatically when notification support ships in the next release."
+      />
       <Card>
         <CardRow label="Morning">
           <input type="time" value={morning} onChange={e => setMorning(e.target.value)}
