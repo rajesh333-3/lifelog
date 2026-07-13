@@ -10,18 +10,30 @@ const PILLAR_META = [
   { key: 'work',     label: 'Work',     icon: '💼', color: '#fbbf24' },
 ]
 
-export function Settings() {
+export function Settings({ onReplayTour }) {
   const [section, setSection] = useState('profile')
 
   return (
     <div className="h-full flex flex-col bg-[#0a0a0a]">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-[#1a1a1a] shrink-0">
-        <h1 className="text-[#f0f0f0] text-sm font-medium">Settings</h1>
-        <p className="text-[#444] text-xs mt-0.5">Profile, AI, pillars & reminders</p>
+      <div className="px-4 py-3 border-b border-[#1a1a1a] shrink-0 flex items-center justify-between">
+        <div>
+          <h1 className="text-[#f0f0f0] text-sm font-medium">Settings</h1>
+          <p className="text-[#444] text-xs mt-0.5">Profile, AI, pillars & reminders</p>
+        </div>
+        <button
+          onClick={onReplayTour}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium active:opacity-60 transition-opacity"
+          style={{ background: '#141414', border: '1px solid #242424', color: '#555' }}
+        >
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path d="M2 6a4 4 0 1 0 4-4V1L4 3l2 2V4a3 3 0 1 1-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Tour
+        </button>
       </div>
 
-      {/* Section tabs — horizontally scrollable so 5 fit */}
+      {/* Section tabs */}
       <div className="flex gap-1 px-3 pt-3 pb-0 shrink-0 overflow-x-auto no-scrollbar">
         {[
           { id: 'profile',   label: 'Profile'   },

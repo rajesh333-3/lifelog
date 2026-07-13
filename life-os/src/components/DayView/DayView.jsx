@@ -536,16 +536,18 @@ function ReadOnlyCard({ label, text }) {
 /* ── Notices ── */
 function FutureNotice() {
   return (
-    <div className="rounded-2xl px-4 py-3.5" style={{ background: '#141414', border: '1px solid #242424' }}>
-      <p className="text-[#484848] text-sm">Not yet — you can schedule tasks for this day.</p>
+    <div className="rounded-2xl px-4 py-4" style={{ background: '#141414', border: '1px solid #242424' }}>
+      <p className="text-[#505050] text-sm font-medium">This day hasn't been written yet.</p>
+      <p className="text-[#343434] text-xs mt-1">You can schedule tasks here to get ahead.</p>
     </div>
   )
 }
 
 function PastNotice() {
   return (
-    <div className="rounded-2xl px-4 py-3" style={{ background: '#141414', border: '1px solid #242424' }}>
-      <p className="text-[#484848] text-xs">Read only · life events still editable</p>
+    <div className="rounded-2xl px-4 py-4" style={{ background: '#141414', border: '1px solid #242424' }}>
+      <p className="text-[#505050] text-sm font-medium">This chapter is sealed.</p>
+      <p className="text-[#343434] text-xs mt-1">Read only · you can still mark life events.</p>
     </div>
   )
 }

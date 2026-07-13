@@ -62,10 +62,21 @@ export function Onboarding({ onComplete }) {
           className="w-full max-w-md"
         >
           {current === 'welcome' && (
-            <Step title="Life Log" subtitle={`"Don't fill your calendar.\nFill your weeks."`}>
-              <p className="text-[#888] text-center text-sm mt-4">
-                A personal operating system that answers one question visually:<br />
-                <span className="text-[#f0f0f0]">how am I actually spending my weeks?</span>
+            <Step title="Life Log" subtitle="">
+              <p className="text-center mt-4 leading-snug" style={{
+                fontFamily:    "'Outfit', system-ui, sans-serif",
+                fontSize:      20,
+                fontWeight:    300,
+                color:         '#c4b5fd',
+                letterSpacing: '-0.2px',
+              }}>
+                Capture today.<br />
+                Understand yesterday.<br />
+                Shape tomorrow.
+              </p>
+              <p className="text-[#484848] text-center text-sm mt-5 leading-relaxed">
+                Write your story, one day at a time.<br />
+                Life is short — and your grid already shows it.
               </p>
             </Step>
           )}
@@ -85,7 +96,7 @@ export function Onboarding({ onComplete }) {
           )}
 
           {current === 'dob' && (
-            <Step title={`Nice to meet you, ${name}.`} subtitle="When were you born? This builds your life grid.">
+            <Step title={`Nice to meet you, ${name}.`} subtitle="When were you born? This anchors your life grid.">
               <input
                 type="date"
                 value={dob}
@@ -95,9 +106,12 @@ export function Onboarding({ onComplete }) {
                 className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-4 text-[#f0f0f0] text-lg focus:outline-none focus:border-[#a78bfa] mt-6 [color-scheme:dark]"
               />
               {dob && (
-                <p className="text-[#888] text-sm text-center mt-3">
-                  You've lived <span className="text-[#a78bfa] font-medium">{weeksGone?.toLocaleString()} weeks</span> so far.
-                </p>
+                <div className="mt-4 text-center">
+                  <p className="text-[#555] text-sm">You've already lived</p>
+                  <p className="text-4xl font-light text-[#a78bfa] mt-1">{weeksGone?.toLocaleString()}</p>
+                  <p className="text-[#555] text-sm mt-1">weeks.</p>
+                  <p className="text-[#383838] text-xs mt-3 italic">Each one a chapter in your story.</p>
+                </div>
               )}
             </Step>
           )}
@@ -119,12 +133,15 @@ export function Onboarding({ onComplete }) {
                   <span>50</span><span>120</span>
                 </div>
                 {dob && (
-                  <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 w-full text-center">
-                    <p className="text-[#888] text-sm">Weeks remaining</p>
-                    <p className="text-3xl font-light text-[#4ade80] mt-1">
+                  <div className="bg-[#141414] border border-[#242424] rounded-2xl p-5 w-full text-center">
+                    <p className="text-[#555] text-xs uppercase tracking-widest">Weeks remaining</p>
+                    <p className="text-5xl font-light text-[#4ade80] mt-2 tabular-nums">
                       {Math.max(0, weeksLeft)?.toLocaleString()}
                     </p>
-                    <p className="text-[#444] text-xs mt-1">of {totalWeeks(life).toLocaleString()} total</p>
+                    <p className="text-[#383838] text-xs mt-2">of {totalWeeks(life).toLocaleString()} total weeks</p>
+                    <p className="text-[#333] text-xs mt-3 italic leading-relaxed">
+                      Each one is a chance to write something worth reading.
+                    </p>
                   </div>
                 )}
               </div>
@@ -165,19 +182,26 @@ export function Onboarding({ onComplete }) {
           )}
 
           {current === 'done' && (
-            <Step title="You're set." subtitle={`Your life grid is ready, ${name}. ${weeksLeft?.toLocaleString()} weeks to fill with intention.`}>
+            <Step title={`Your grid is ready, ${name}.`} subtitle="">
+              <p className="text-center text-[#484848] text-sm leading-relaxed mt-3">
+                {weeksGone?.toLocaleString()} weeks already lived.<br />
+                <span className="text-[#4ade80]">{Math.max(0, weeksLeft)?.toLocaleString()} weeks</span> still yours to write.
+              </p>
               <div className="mt-6 grid grid-cols-3 gap-3 text-center">
                 {[
-                  { label: 'Weeks lived', value: weeksGone?.toLocaleString(), color: '#888' },
-                  { label: 'Weeks left',  value: Math.max(0, weeksLeft)?.toLocaleString(), color: '#4ade80' },
-                  { label: 'Life span',   value: `${life} yrs`, color: '#a78bfa' },
+                  { label: 'Lived',    value: weeksGone?.toLocaleString(),              color: '#555'    },
+                  { label: 'Ahead',    value: Math.max(0, weeksLeft)?.toLocaleString(), color: '#4ade80' },
+                  { label: 'Lifespan', value: `${life} yrs`,                            color: '#a78bfa' },
                 ].map(({ label, value, color }) => (
-                  <div key={label} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-3">
-                    <p className="text-xs text-[#888]">{label}</p>
-                    <p className="text-xl font-light mt-1" style={{ color }}>{value}</p>
+                  <div key={label} className="rounded-2xl p-3" style={{ background: '#141414', border: '1px solid #242424' }}>
+                    <p className="text-[10px] text-[#444] uppercase tracking-widest">{label}</p>
+                    <p className="text-xl font-light mt-1 tabular-nums" style={{ color }}>{value}</p>
                   </div>
                 ))}
               </div>
+              <p className="text-center text-[#333] text-xs mt-5 italic leading-relaxed">
+                "The best time to start was last week.<br />The next best time is today."
+              </p>
             </Step>
           )}
 

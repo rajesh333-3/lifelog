@@ -9,7 +9,17 @@ import { InsightsView } from './components/Insights/InsightsView'
 import { EisenhowerBoard } from './components/Eisenhower/EisenhowerBoard'
 import { Settings } from './components/Settings/Settings'
 import { CalendarTrigger, CalendarPicker } from './components/Calendar/CalendarPicker'
+import { WelcomeTour } from './components/Tour/WelcomeTour'
 import { todayStr } from './utils/dateUtils'
+
+const LOADING_QUOTES = [
+  'Capture today.\nUnderstand yesterday.\nShape tomorrow.',
+  'Life is short.\nLook at your grid.',
+  'Every dot is a week\nyou\'ll never get back —\nor one you can still shape.',
+  'Write your story,\none day at a time.',
+  'The weeks don\'t wait.\nBut you still have time.',
+  'Small days\nbuild extraordinary years.',
+]
 
 const NAV = [
   { id: 'grid',     label: 'Grid',     icon: GridIcon },
@@ -21,21 +31,39 @@ const NAV = [
 
 export default function App() {
   const { profile, loaded, load } = useSettingsStore()
-  const [activeTab, setActiveTab]     = useState('grid')
-  const [dayViewDate, setDayViewDate] = useState(null)  // null = closed
+  const [activeTab, setActiveTab] = useState('grid')
+  const [showTour, setShowTour]   = useState(false)
 
-  // LifeGrid dot clicks open DayView
-  const openDayView = useAppStore(s => s.openDayView)
+  const openDayView  = useAppStore(s => s.openDayView)
   const selectedDate = useAppStore(s => s.selectedDate)
   const activePanel  = useAppStore(s => s.activePanel)
   const closePanel   = useAppStore(s => s.closePanel)
 
   useEffect(() => { load() }, [load])
 
+  // Show tour once after onboarding completes
+  useEffect(() => {
+    if (profile && !localStorage.getItem('lifelog_tour_done')) {
+      setShowTour(true)
+    }
+  }, [profile])
+
   if (!loaded) {
     return (
-      <div className="min-h-dvh bg-[#0a0a0a] flex items-center justify-center">
+      <div className="min-h-dvh bg-[#0a0a0a] flex flex-col items-center justify-center gap-6 px-8">
         <div className="w-2 h-2 rounded-full bg-[#a78bfa] animate-ping" />
+        <p style={{
+          fontFamily:    "'Outfit', system-ui, sans-serif",
+          fontSize:      15,
+          fontWeight:    300,
+          fontStyle:     'italic',
+          color:         '#303030',
+          textAlign:     'center',
+          lineHeight:    1.6,
+          letterSpacing: '-0.1px',
+        }}>
+          {LOADING_QUOTES[Math.floor(Math.random() * LOADING_QUOTES.length)]}
+        </p>
       </div>
     )
   }
@@ -46,7 +74,13 @@ export default function App() {
 
   return (
     <div className="min-h-dvh bg-[#0a0a0a] flex flex-col select-none">
-      <Header profile={profile} />
+      <Header profile={profile} onReplayTour={() => setShowTour(true)} />
+
+      <AnimatePresence>
+        {showTour && (
+          <WelcomeTour onDone={() => setShowTour(false)} />
+        )}
+      </AnimatePresence>
 
       <main className="flex-1 overflow-hidden relative">
         <AnimatePresence mode="wait">
@@ -74,7 +108,7 @@ export default function App() {
           )}
           {activeTab === 'settings' && (
             <TabPanel key="settings">
-              <Settings />
+              <Settings onReplayTour={() => setShowTour(true)} />
             </TabPanel>
           )}
           {activeTab !== 'grid' && activeTab !== 'today' && activeTab !== 'ai' && activeTab !== 'tasks' && activeTab !== 'settings' && (
