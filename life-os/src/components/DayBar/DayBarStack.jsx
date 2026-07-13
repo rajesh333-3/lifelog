@@ -12,7 +12,7 @@ const PILLAR_COLOR = {
 const SEG_MAX = 28   // px per segment at score=100
 const BAR_TOTAL = SEG_MAX * 3 + 4  // 88px total
 
-export function DayBarStack({ date, dayData, isToday, onOuterMouseLeave }) {
+export function DayBarStack({ date, dayData, isToday, onOuterMouseLeave, disableHoverCard = false }) {
   const barRef  = useRef(null)
   const hideRef = useRef(null)
   const [cardVisible, setCardVisible] = useState(false)
@@ -103,18 +103,20 @@ export function DayBarStack({ date, dayData, isToday, onOuterMouseLeave }) {
         <div className="w-1 h-1 rounded-full bg-[#a78bfa]" />
       )}
 
-      {/* Day hover card */}
-      <AnimatePresence>
-        {cardVisible && logged && (
-          <DayHoverCard
-            date={date}
-            dayData={dayData}
-            anchorRef={barRef}
-            onMouseEnter={keepCard}
-            onMouseLeave={hideCard}
-          />
-        )}
-      </AnimatePresence>
+      {/* Day hover card — suppressed when used inside WeekTooltip */}
+      {!disableHoverCard && (
+        <AnimatePresence>
+          {cardVisible && logged && (
+            <DayHoverCard
+              date={date}
+              dayData={dayData}
+              anchorRef={barRef}
+              onMouseEnter={keepCard}
+              onMouseLeave={hideCard}
+            />
+          )}
+        </AnimatePresence>
+      )}
     </div>
   )
 }

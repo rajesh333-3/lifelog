@@ -2,35 +2,40 @@ import Dexie from 'dexie'
 
 export const db = new Dexie('LifeOS')
 
+// v2 → v3: todos gain createdDate + completedDate indexes (date kept for compat)
+db.version(3).stores({
+  days:     'date, weekId',
+  weeks:    'weekId',
+  todos:    '++id, quadrant, type, createdDate, completedDate, dueDate',
+  hobbies:  '++id, priority',
+  settings: 'key',
+  chatLogs: 'date',
+}).upgrade(tx => {
+  // Migrate old todos: copy date → createdDate if missing
+  return tx.table('todos').toCollection().modify(t => {
+    if (!t.createdDate && t.date) t.createdDate = t.date
+  })
+})
+
 db.version(2).stores({
   days:     'date, weekId',
   weeks:    'weekId',
-  todos:    '++id, quadrant, dueDate, type, date',   // type: 'task'|'hobby'|'reminder'
-  hobbies:  '++id, priority',                         // global hobby definitions
+  todos:    '++id, quadrant, dueDate, type, date',
+  hobbies:  '++id, priority',
   settings: 'key',
   chatLogs: 'date',
 })
 
-// days row shape:
-// { date, weekId, physical, mental, work (0–100),
-//   physicalNote, mentalNote, workNote,
-//   physicalSummary, mentalSummary, workSummary,
-//   wentWell, couldBeBetter, tags[], aiNote,
-//   checklistState {goalId: bool}, overallScore, color,
-//   taskIds[], hobbyLogs: [{ hobbyId, minutes, note }] }
-
-// todos row shape (tasks):
-// { id, type:'task', title, quadrant:'Q1'|'Q2'|'Q3'|'Q4', urgency, importance,
-//   date (YYYY-MM-DD, the day it belongs to), dueDate, done, aiReason }
-
-// hobbies row shape:
-// { id, name, description, color, priority (0=top), icon }
-
-// settings rows (singleton by key):
-// { key:'profile',   value: { name, dob, lifeExpectancy, timezone } }
-// { key:'pillars',   value: { physical:[], mental:[], work:[] } }
-// { key:'llm',       value: { provider:'ollama'|'gemini', apiKey, ollamaUrl } }
-// { key:'reminders', value: { morning:'07:30', midday:'13:00', evening:'21:00' } }
+// todos row shape:
+// { id, tid (T-001), type:'task',
+//   title, quadrant:'Q1'|'Q2'|'Q3'|'Q4', urgent, important,
+//   createdDate (YYYY-MM-DD — day it was created/assigned),
+//   dueDate     (YYYY-MM-DD — optional deadline),
+//   completedDate (YYYY-MM-DD — day it was marked done, null if open),
+//   done (bool) }
+//
+// Visibility rule:  show on date D  iff  createdDate <= D  AND  (done===false OR completedDate===D)
+// This gives free "propagate until closed" behaviour with no record duplication.
 
 export async function getSetting(key) {
   const row = await db.settings.get(key)
@@ -41,10 +46,25 @@ export async function setSetting(key, value) {
   await db.settings.put({ key, value })
 }
 
-// Generates a prefixed human-readable ID like T-001, H-004
 export async function nextId(type) {
   const prefix = type === 'task' ? 'T' : type === 'hobby' ? 'H' : 'R'
   const all    = await db.todos.where('type').equals(type).toArray()
   const num    = String(all.length + 1).padStart(3, '0')
   return `${prefix}-${num}`
+}
+
+// Returns tasks visible on a given date (float-forward logic)
+export async function tasksForDate(date) {
+  const all = await db.todos.where('type').equals('task').toArray()
+  return all.filter(t => {
+    const created = t.createdDate ?? t.date   // backward compat
+    if (!created || created > date) return false
+    if (!t.done) return true
+    return t.completedDate === date            // show completion on the day it was closed
+  })
+}
+
+// Returns all open tasks (for Eisenhower board)
+export async function openTasks() {
+  return db.todos.where('type').equals('task').filter(t => !t.done).toArray()
 }

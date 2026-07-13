@@ -1,31 +1,51 @@
-import { useRef } from 'react'
+import { memo, useRef } from 'react'
 
-export function WeekDot({ weekIndex, state, color, fillPct, isCurrent, onClick, onHoverStart, onHoverEnd }) {
+export const WeekDot = memo(function WeekDot({
+  weekIndex, state, color, fillPct, isCurrent, hasLifeEvent, isLocked, dotRef,
+}) {
   const ref = useRef(null)
 
+  function setRef(el) {
+    ref.current = el
+    if (dotRef) dotRef.current = el
+  }
+
+  // Lived = solid filled square. Future = ghost outline only, clearly empty.
+  const isFuture = state === 'future'
   const bg = isCurrent
-    ? `conic-gradient(${color ?? '#a78bfa'} ${fillPct ?? 0}%, #1e1e1e ${fillPct ?? 0}%)`
-    : color ?? (state === 'lived' ? '#252525' : '#141414')
+    ? `conic-gradient(${color ?? '#a78bfa'} ${fillPct ?? 0}%, #1a1a1a ${fillPct ?? 0}%)`
+    : isFuture
+      ? 'transparent'
+      : color ?? '#2a2a2a'
 
   return (
     <div
-      ref={ref}
-      onClick={onClick}
-      onMouseEnter={() => onHoverStart?.(ref.current)}
-      onMouseLeave={() => onHoverEnd?.()}
-      onTouchStart={() => onHoverStart?.(ref.current)}
-      onTouchEnd={() => onHoverEnd?.()}
+      ref={setRef}
+      data-week={weekIndex}
       className={[
-        'rounded-[2px] cursor-pointer transition-all duration-100',
-        'hover:scale-[1.5] hover:z-10 active:scale-125',
-        isCurrent ? 'week-current' : '',
+        'relative rounded-[2px] cursor-pointer transition-transform duration-100',
+        isLocked ? 'scale-[1.4] z-10' : 'hover:scale-[1.5] hover:z-10 active:scale-125',
       ].join(' ')}
       style={{
         width: '100%',
         aspectRatio: '1',
         background: bg,
-        opacity: state === 'future' ? 0.5 : 1,
+        // Future weeks: just a barely-visible border, no fill
+        boxShadow: isFuture && !isLocked ? 'inset 0 0 0 0.5px rgba(255,255,255,0.07)' : undefined,
       }}
-    />
+    >
+      {isLocked && (
+        <div
+          className="absolute inset-0 rounded-[2px] pointer-events-none"
+          style={{ boxShadow: '0 0 0 1.5px #a78bfa, 0 0 6px #a78bfa55' }}
+        />
+      )}
+      {hasLifeEvent && (
+        <div
+          className="absolute top-0 right-0 w-[35%] h-[35%] rounded-full pointer-events-none"
+          style={{ background: '#60a5fa', transform: 'translate(25%, -25%)', boxShadow: '0 0 3px #60a5fa' }}
+        />
+      )}
+    </div>
   )
-}
+})

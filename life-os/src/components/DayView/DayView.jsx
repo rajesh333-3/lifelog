@@ -4,95 +4,107 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db'
 import { useAppStore } from '../../store/useAppStore'
 import { useSettingsStore } from '../../store/useSettingsStore'
-import { todayStr, isFuture, isToday, formatDate, weekDates, dateToWeekIndex } from '../../utils/dateUtils'
+import {
+  todayStr, isFuture, isToday, formatDate,
+  weekDates, dateToWeekIndex, toDateStr,
+} from '../../utils/dateUtils'
 import { overallScore, scoreToColor } from '../../utils/scoreUtils'
 import { PillarSlider } from './PillarSlider'
+import { PillarReadOnly } from './PillarReadOnly'
 import { TaskSection } from './TaskSection'
 import { HobbySection } from './HobbySection'
 
-const SLIDE_PANEL = {
-  initial:  { x: '100%', opacity: 0 },
-  animate:  { x: 0,      opacity: 1 },
-  exit:     { x: '100%', opacity: 0 },
-  transition: { type: 'spring', stiffness: 380, damping: 36, mass: 0.8 },
+const SLIDE = {
+  initial:    { x: '100%', opacity: 0 },
+  animate:    { x: 0,      opacity: 1 },
+  exit:       { x: '100%', opacity: 0 },
+  transition: { type: 'spring', stiffness: 380, damping: 38, mass: 0.8 },
 }
 
 export function DayView({ initialDate, asOverlay = false }) {
   const closePanelStore = useAppStore(s => s.closePanel)
-  const closePanel = asOverlay ? closePanelStore : null
-  const profile    = useSettingsStore(s => s.profile)
-  const pillars    = useSettingsStore(s => s.pillars)
+  const closePanel      = asOverlay ? closePanelStore : null
+  const profile         = useSettingsStore(s => s.profile)
 
-  const [date, setDate]   = useState(initialDate ?? todayStr())
-  const saveTimer         = useRef(null)
+  const [date, setDate]     = useState(initialDate ?? todayStr())
+  const [saveState, setSaveState] = useState('idle') // 'idle' | 'saving' | 'saved'
+  const saveTimer = useRef(null)
+  const saveStateTimer = useRef(null)
 
-  const future   = isFuture(date)
-  const today    = isToday(date)
+  const isPast   = !isToday(date) && !isFuture(date)
+  const isFut    = isFuture(date)
+  const isTod    = isToday(date)
 
   const dayData = useLiveQuery(() => db.days.get(date), [date])
 
-  const [local, setLocal] = useState({
-    physical: 50, mental: 50, work: 50,
-    physicalNote: '', mentalNote: '', workNote: '',
-    wentWell: '', couldBeBetter: '',
-  })
+  const [local, setLocal] = useState(emptyDay())
 
-  // Sync local state when day changes or data loads
   useEffect(() => {
-    if (dayData) {
-      setLocal({
-        physical:       dayData.physical       ?? 50,
-        mental:         dayData.mental         ?? 50,
-        work:           dayData.work           ?? 50,
-        physicalNote:   dayData.physicalNote   ?? '',
-        mentalNote:     dayData.mentalNote     ?? '',
-        workNote:       dayData.workNote       ?? '',
-        wentWell:       dayData.wentWell       ?? '',
-        couldBeBetter:  dayData.couldBeBetter  ?? '',
-      })
-    } else {
-      setLocal({ physical: 50, mental: 50, work: 50, physicalNote: '', mentalNote: '', workNote: '', wentWell: '', couldBeBetter: '' })
-    }
+    setLocal(dayData ? {
+      physical:      dayData.physical      ?? 50,
+      mental:        dayData.mental        ?? 50,
+      work:          dayData.work          ?? 50,
+      physicalNote:  dayData.physicalNote  ?? '',
+      mentalNote:    dayData.mentalNote    ?? '',
+      workNote:      dayData.workNote      ?? '',
+      wentWell:      dayData.wentWell      ?? '',
+      couldBeBetter: dayData.couldBeBetter ?? '',
+      lifeEvent:     dayData.lifeEvent     ?? false,
+      lifeEventNote: dayData.lifeEventNote ?? '',
+    } : emptyDay())
   }, [date, dayData?.date])
 
-  // Auto-save with debounce
-  const save = useCallback(async (patch) => {
-    if (future) return
+  const persist = useCallback(async (patch) => {
+    setSaveState('saving')
+    clearTimeout(saveStateTimer.current)
+    const base    = (await db.days.get(date)) ?? { date, weekId: date.slice(0, 7) }
+    const merged  = { ...base, ...patch }
+    const overall = overallScore(merged.physical, merged.mental, merged.work)
+    merged.overallScore = overall
+    merged.color        = merged.lifeEvent ? '#60a5fa' : scoreToColor(overall)
+    await db.days.put(merged)
+    setSaveState('saved')
+    saveStateTimer.current = setTimeout(() => setSaveState('idle'), 2200)
+  }, [date])
+
+  // Debounced auto-save for text inputs only
+  function autoSave(next) {
     clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      const base = (await db.days.get(date)) ?? { date, weekId: date.slice(0, 7) }
-      const merged = { ...base, ...patch }
-      const overall = overallScore(merged.physical, merged.mental, merged.work)
-      merged.overallScore = overall
-      merged.color        = scoreToColor(overall)
-      await db.days.put(merged)
-    }, 600)
-  }, [date, future])
+    saveTimer.current = setTimeout(() => persist(next), 800)
+  }
 
   function update(field, value) {
     const next = { ...local, [field]: value }
     setLocal(next)
-    save(next)
+    autoSave(next)
   }
 
-  // Navigate to adjacent day
+  // Explicit save (for sliders & manual button press)
+  function saveNow(patch) {
+    clearTimeout(saveTimer.current)
+    const next = patch ? { ...local, ...patch } : local
+    if (patch) setLocal(next)
+    persist(next)
+  }
+
   function goDay(delta) {
     const d = new Date(date + 'T00:00:00')
     d.setDate(d.getDate() + delta)
-    const next = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-    setDate(next)
+    setDate(toDateStr(d))
   }
 
-  const overall      = future ? null : overallScore(local.physical, local.mental, local.work)
-  const overallColor = scoreToColor(overall)
+  const overall      = overallScore(local.physical, local.mental, local.work)
+  const overallColor = local.lifeEvent ? '#60a5fa' : scoreToColor(overall)
 
   return (
     <motion.div
-      className="fixed inset-0 z-40 bg-[#0a0a0a] flex flex-col"
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
-      {...SLIDE_PANEL}
+      className={asOverlay
+        ? 'fixed inset-0 z-40 bg-[#0a0a0a] flex flex-col'
+        : 'h-full flex flex-col bg-[#0a0a0a]'}
+      style={asOverlay ? { paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'calc(56px + env(safe-area-inset-bottom))' } : undefined}
+      {...(asOverlay ? SLIDE : {})}
     >
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a] shrink-0">
         <button
           onClick={closePanel ?? undefined}
@@ -103,7 +115,7 @@ export function DayView({ initialDate, asOverlay = false }) {
           </svg>
         </button>
 
-        {/* Date navigator */}
+        {/* Date nav */}
         <div className="flex items-center gap-2">
           <button onClick={() => goDay(-1)}
             className="w-8 h-8 rounded-full flex items-center justify-center text-[#444] active:text-[#f0f0f0]">
@@ -111,10 +123,13 @@ export function DayView({ initialDate, asOverlay = false }) {
               <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
           </button>
-          <div className="text-center">
+          <div className="text-center min-w-[110px]">
             <p className="text-[#f0f0f0] text-sm font-medium">{formatDate(date)}</p>
-            {today && <p className="text-[#a78bfa] text-[10px] uppercase tracking-widest">Today</p>}
-            {future && <p className="text-[#fbbf24] text-[10px] uppercase tracking-widest">Future</p>}
+            <p className="text-[10px] uppercase tracking-widest" style={{
+              color: isTod ? '#a78bfa' : isFut ? '#fbbf24' : '#444'
+            }}>
+              {isTod ? 'Today' : isFut ? 'Future' : 'Past'}
+            </p>
           </div>
           <button onClick={() => goDay(1)}
             className="w-8 h-8 rounded-full flex items-center justify-center text-[#444] active:text-[#f0f0f0]">
@@ -124,112 +139,239 @@ export function DayView({ initialDate, asOverlay = false }) {
           </button>
         </div>
 
-        {/* Score badge */}
-        {!future && overall != null ? (
+        {/* Score / lock badge */}
+        {!isFut && (
           <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold"
-            style={{ background: `${overallColor}18`, color: overallColor, border: `1px solid ${overallColor}30` }}
-          >{overall}</div>
-        ) : (
-          <div className="w-9 h-9" />
+            className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold transition-all"
+            style={{
+              background: `${overallColor ?? '#222'}22`,
+              color:       overallColor ?? '#444',
+              border:      `1px solid ${overallColor ?? '#222'}44`,
+            }}
+          >
+            {isPast && !local.lifeEvent ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="2" y="6" width="10" height="7" rx="1.5" stroke="#444" strokeWidth="1.3"/>
+                <path d="M4.5 6V4.5a2.5 2.5 0 015 0V6" stroke="#444" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            ) : overall ?? '—'}
+          </div>
         )}
+        {isFut && <div className="w-9 h-9" />}
       </div>
 
-      {/* ── 7-day strip ── */}
-      <WeekStrip date={date} dob={profile?.dob} onSelect={setDate} />
+      {/* 7-day strip */}
+      {profile?.dob && (
+        <WeekStrip date={date} dob={profile.dob} onSelect={setDate} />
+      )}
 
-      {/* ── Scrollable content ── */}
+      {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto no-scrollbar">
-        {future ? (
-          <FutureNotice date={date} />
-        ) : (
-          <div className="px-4 py-4 flex flex-col gap-5 pb-8">
-            {/* Pillars */}
-            <Section title="Your Day" subtitle="Score and reflect on each pillar">
-              <div className="flex flex-col gap-4">
+
+        {/* ── FUTURE mode ── */}
+        {isFut && (
+          <div className="px-4 pt-3 pb-6 flex flex-col gap-3">
+            <FutureNotice />
+            <Section title="Schedule">
+              <TaskSection date={date} futureOnly />
+            </Section>
+          </div>
+        )}
+
+        {/* ── PAST mode ── */}
+        {isPast && (
+          <div className="px-4 pt-3 pb-6 flex flex-col gap-3">
+            <PastNotice />
+
+            {dayData ? (
+              <Section title="Your Day">
+                <div className="flex flex-col gap-2.5">
+                  <PillarReadOnly icon="💪" label="Physical" color="#4ade80"
+                    value={local.physical} note={local.physicalNote} />
+                  <PillarReadOnly icon="🧠" label="Mental"   color="#60a5fa"
+                    value={local.mental}   note={local.mentalNote}   />
+                  <PillarReadOnly icon="💼" label="Work"     color="#fbbf24"
+                    value={local.work}     note={local.workNote}     />
+                </div>
+              </Section>
+            ) : (
+              <Section title="Your Day">
+                <p className="text-[#555] text-sm">No data logged for this day.</p>
+              </Section>
+            )}
+
+            {(local.wentWell || local.couldBeBetter) && (
+              <Section title="Reflection">
+                <div className="flex flex-col gap-2">
+                  {local.wentWell && (
+                    <ReadOnlyCard label="✦  What went well" text={local.wentWell} />
+                  )}
+                  {local.couldBeBetter && (
+                    <ReadOnlyCard label="↺  Could be better" text={local.couldBeBetter} />
+                  )}
+                </div>
+              </Section>
+            )}
+
+            <Section title="Tasks">
+              <TaskSection date={date} readOnly />
+            </Section>
+
+            <LifeEventSection
+              value={local.lifeEvent}
+              note={local.lifeEventNote}
+              onToggle={v => saveNow({ ...local, lifeEvent: v })}
+              onNote={v => update('lifeEventNote', v)}
+            />
+          </div>
+        )}
+
+        {/* ── TODAY mode ── */}
+        {isTod && (
+          <div className="px-4 pt-3 pb-6 flex flex-col gap-3">
+            <Section title="Pillars">
+              <div className="flex flex-col gap-3">
                 <PillarSlider icon="💪" label="Physical" color="#4ade80"
-                  value={local.physical} note={local.physicalNote}
+                  value={local.physical}     note={local.physicalNote}
                   onValue={v => update('physical', v)}
                   onNote={v => update('physicalNote', v)} />
-                <PillarSlider icon="🧠" label="Mental" color="#60a5fa"
-                  value={local.mental} note={local.mentalNote}
+                <PillarSlider icon="🧠" label="Mental"   color="#60a5fa"
+                  value={local.mental}       note={local.mentalNote}
                   onValue={v => update('mental', v)}
                   onNote={v => update('mentalNote', v)} />
-                <PillarSlider icon="💼" label="Work" color="#fbbf24"
-                  value={local.work} note={local.workNote}
+                <PillarSlider icon="💼" label="Work"     color="#fbbf24"
+                  value={local.work}         note={local.workNote}
                   onValue={v => update('work', v)}
                   onNote={v => update('workNote', v)} />
               </div>
             </Section>
 
-            {/* Reflection */}
-            <Section title="Reflection" subtitle="What stood out today?">
-              <div className="flex flex-col gap-3">
-                <ReflectField
-                  label="✦  What went well"
-                  value={local.wentWell}
-                  onChange={v => update('wentWell', v)}
-                  placeholder="A win, however small…"
-                />
-                <ReflectField
-                  label="↺  Could be better"
-                  value={local.couldBeBetter}
-                  onChange={v => update('couldBeBetter', v)}
-                  placeholder="One thing to improve…"
-                />
+            <Section title="Reflection">
+              <div className="grid grid-cols-2 gap-2">
+                <ReflectField label="✦  Went well"    value={local.wentWell}
+                  onChange={v => update('wentWell', v)}      placeholder="A win, however small…" />
+                <ReflectField label="↺  Improve"   value={local.couldBeBetter}
+                  onChange={v => update('couldBeBetter', v)} placeholder="One thing to work on…" />
               </div>
             </Section>
 
-            {/* Tasks */}
-            <Section title="Tasks" subtitle="What needed doing today">
+            <Section title="Tasks">
               <TaskSection date={date} />
             </Section>
 
-            {/* Hobbies */}
-            <Section title="Hobbies" subtitle="Time spent on what you love">
+            <Section title="Hobbies">
               <HobbySection date={date} />
             </Section>
-          </div>
-        )}
 
-        {/* Future: task scheduling only */}
-        {future && (
-          <div className="px-4 pt-2 pb-8">
-            <Section title="Schedule" subtitle="Plan tasks or deadlines for this day">
-              <TaskSection date={date} futureOnly />
-            </Section>
+            <LifeEventSection
+              value={local.lifeEvent}
+              note={local.lifeEventNote}
+              onToggle={v => saveNow({ ...local, lifeEvent: v })}
+              onNote={v => update('lifeEventNote', v)}
+            />
           </div>
         )}
       </div>
+
+      {/* Auto-save indicator — subtle top-right badge, no blocking button */}
+      {isTod && saveState !== 'idle' && (
+        <div className="absolute top-[60px] right-3 pointer-events-none" style={{ zIndex: 10 }}>
+          <motion.div
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+            style={{ background: saveState === 'saved' ? 'rgba(74,222,128,0.1)' : 'rgba(167,139,250,0.1)', border: `1px solid ${saveState === 'saved' ? '#4ade8033' : '#a78bfa33'}` }}
+          >
+            {saveState === 'saved' ? (
+              <>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M2 5l2.5 2.5 3.5-4" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                <span className="text-[10px]" style={{ color: '#4ade80' }}>Saved</span>
+              </>
+            ) : (
+              <span className="text-[10px]" style={{ color: '#a78bfa' }}>Saving…</span>
+            )}
+          </motion.div>
+        </div>
+      )}
     </motion.div>
+  )
+}
+
+/* ── Life Event section ── */
+function LifeEventSection({ value, note, onToggle, onNote }) {
+  return (
+    <Section title="Life Event" subtitle="Mark this day as a milestone — always editable">
+      <div className="bg-[#111] border rounded-xl overflow-hidden"
+        style={{ borderColor: value ? '#60a5fa33' : '#1e1e1e' }}>
+        <button
+          onClick={() => onToggle(!value)}
+          className="w-full flex items-center justify-between px-4 py-3.5 active:opacity-70"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-2 h-2 rounded-full" style={{ background: value ? '#60a5fa' : '#2a2a2a' }} />
+            <span className="text-sm" style={{ color: value ? '#60a5fa' : '#555' }}>
+              {value ? 'Life event marked' : 'Mark as life event'}
+            </span>
+          </div>
+          <div
+            className="w-10 h-6 rounded-full transition-colors flex items-center px-0.5"
+            style={{ background: value ? '#60a5fa33' : '#1a1a1a', border: `1px solid ${value ? '#60a5fa55' : '#2a2a2a'}` }}
+          >
+            <motion.div
+              className="w-4 h-4 rounded-full"
+              style={{ background: value ? '#60a5fa' : '#333' }}
+              animate={{ x: value ? 16 : 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            />
+          </div>
+        </button>
+
+        <AnimatePresence>
+          {value && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-t overflow-hidden"
+              style={{ borderColor: '#60a5fa22' }}
+            >
+              <textarea
+                value={note}
+                onChange={e => onNote(e.target.value)}
+                placeholder="Describe this life event…"
+                rows={3}
+                className="w-full bg-transparent px-4 py-3 text-sm text-[#f0f0f0] placeholder:text-[#2a2a2a] resize-none focus:outline-none leading-relaxed"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </Section>
   )
 }
 
 /* ── 7-day strip ── */
 function WeekStrip({ date, dob, onSelect }) {
-  if (!dob) return null
-  const weekIdx = dateToWeekIndex(dob, date)
-  const dates   = weekDates(dob, weekIdx)
-  const today   = todayStr()
-  const DAY_LABELS = ['M','T','W','T','F','S','S']
+  const weekIdx  = dateToWeekIndex(dob, date)
+  const dates    = weekDates(dob, weekIdx)
+  const today    = todayStr()
+  const LABELS   = ['M','T','W','T','F','S','S']
 
   return (
     <div className="flex border-b border-[#1a1a1a] shrink-0">
       {dates.map((d, i) => {
-        const active  = d === date
-        const isT     = d === today
-        const fut     = d > today
+        const active = d === date
+        const isT    = d === today
+        const fut    = d > today
         return (
-          <button
-            key={d}
-            onClick={() => onSelect(d)}
+          <button key={d} onClick={() => onSelect(d)}
             className="flex-1 flex flex-col items-center py-2.5 gap-1 transition-colors"
-            style={{ background: active ? '#1a1a1a' : 'transparent' }}
-          >
+            style={{ background: active ? '#161616' : 'transparent' }}>
             <span className="text-[9px] uppercase tracking-widest"
-              style={{ color: isT ? '#a78bfa' : '#333' }}>{DAY_LABELS[i]}</span>
+              style={{ color: isT ? '#a78bfa' : '#555' }}>{LABELS[i]}</span>
             <span className="text-[13px] font-medium"
-              style={{ color: active ? '#f0f0f0' : fut ? '#2a2a2a' : '#555' }}>
+              style={{ color: active ? '#f0f0f0' : fut ? '#222' : '#555' }}>
               {new Date(d + 'T00:00:00').getDate()}
             </span>
             {isT && <div className="w-1 h-1 rounded-full bg-[#a78bfa]" />}
@@ -240,46 +382,61 @@ function WeekStrip({ date, dob, onSelect }) {
   )
 }
 
-/* ── Section wrapper ── */
-function Section({ title, subtitle, children }) {
+/* ── Reusable section wrapper ── */
+function Section({ title, children }) {
   return (
     <div>
-      <div className="mb-3">
-        <h2 className="text-[#f0f0f0] text-sm font-medium">{title}</h2>
-        {subtitle && <p className="text-[#444] text-xs mt-0.5">{subtitle}</p>}
-      </div>
+      <p className="text-[#777] text-[10px] uppercase tracking-widest font-medium mb-2">{title}</p>
       {children}
     </div>
   )
 }
 
-/* ── Reflection text field ── */
+/* ── Editable reflection textarea ── */
 function ReflectField({ label, value, onChange, placeholder }) {
   return (
-    <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-3">
-      <p className="text-[#555] text-[10px] uppercase tracking-widest mb-2">{label}</p>
+    <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-3 flex flex-col">
+      <p className="text-[#444] text-[9px] uppercase tracking-widest mb-1.5">{label}</p>
       <textarea
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        rows={2}
-        className="w-full bg-transparent text-[#f0f0f0] text-sm placeholder:text-[#2a2a2a] resize-none focus:outline-none leading-relaxed"
+        rows={3}
+        className="flex-1 w-full bg-transparent text-[#e0e0e0] text-xs placeholder:text-[#222] resize-none focus:outline-none leading-relaxed"
       />
     </div>
   )
 }
 
-/* ── Future day notice ── */
-function FutureNotice({ date }) {
+/* ── Read-only text card for past days ── */
+function ReadOnlyCard({ label, text }) {
   return (
-    <div className="flex flex-col items-center justify-center h-40 gap-2 px-8">
-      <div className="w-8 h-8 rounded-full bg-[#1a1a1a] flex items-center justify-center">
-        <span className="text-sm">⏳</span>
-      </div>
-      <p className="text-[#444] text-sm text-center">
-        This day hasn't happened yet.<br/>
-        <span className="text-[#555]">You can schedule tasks below.</span>
-      </p>
+    <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-3">
+      <p className="text-[#555] text-[10px] uppercase tracking-widest mb-1.5">{label}</p>
+      <p className="text-[#888] text-sm leading-relaxed">{text}</p>
     </div>
   )
+}
+
+/* ── Notices ── */
+function FutureNotice() {
+  return (
+    <p className="text-[#666] text-xs">Not yet — you can schedule tasks for this day.</p>
+  )
+}
+
+function PastNotice() {
+  return (
+    <p className="text-[#555] text-xs">Read only · life events still editable</p>
+  )
+}
+
+/* ── Default empty day state ── */
+function emptyDay() {
+  return {
+    physical: 50, mental: 50, work: 50,
+    physicalNote: '', mentalNote: '', workNote: '',
+    wentWell: '', couldBeBetter: '',
+    lifeEvent: false, lifeEventNote: '',
+  }
 }

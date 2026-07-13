@@ -5,13 +5,15 @@ import { useAppStore } from './store/useAppStore'
 import { Onboarding } from './components/Onboarding/Onboarding'
 import { LifeGrid } from './components/LifeGrid/LifeGrid'
 import { DayView } from './components/DayView/DayView'
-import { AIChatPlaceholder } from './components/AIChat/AIChatPlaceholder'
+import { InsightsView } from './components/Insights/InsightsView'
+import { EisenhowerBoard } from './components/Eisenhower/EisenhowerBoard'
+import { Settings } from './components/Settings/Settings'
 import { todayStr } from './utils/dateUtils'
 
 const NAV = [
   { id: 'grid',     label: 'Grid',     icon: GridIcon },
   { id: 'today',    label: 'Today',    icon: TodayIcon },
-  { id: 'ai',       label: 'AI Chat',  icon: AIIcon },
+  { id: 'ai',       label: 'Insights', icon: InsightsIcon },
   { id: 'tasks',    label: 'Tasks',    icon: TasksIcon },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
@@ -61,10 +63,20 @@ export default function App() {
           )}
           {activeTab === 'ai' && (
             <TabPanel key="ai">
-              <AIChatPlaceholder name={profile.name} />
+              <InsightsView />
             </TabPanel>
           )}
-          {activeTab !== 'grid' && activeTab !== 'today' && activeTab !== 'ai' && (
+          {activeTab === 'tasks' && (
+            <TabPanel key="tasks">
+              <EisenhowerBoard />
+            </TabPanel>
+          )}
+          {activeTab === 'settings' && (
+            <TabPanel key="settings">
+              <Settings />
+            </TabPanel>
+          )}
+          {activeTab !== 'grid' && activeTab !== 'today' && activeTab !== 'ai' && activeTab !== 'tasks' && activeTab !== 'settings' && (
             <TabPanel key={activeTab}>
               <ComingSoon tab={activeTab} />
             </TabPanel>
@@ -72,7 +84,7 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <BottomNav active={activeTab} onChange={setActiveTab} />
+      <BottomNav active={activeTab} onChange={(tab) => { closePanel(); setActiveTab(tab) }} />
 
       {/* DayView overlay — opened from grid dot tap */}
       <AnimatePresence>
@@ -86,7 +98,8 @@ export default function App() {
 
 /* ── Header ── */
 function Header({ profile }) {
-  const [logoSrc, setLogoSrc] = useState(() => localStorage.getItem('lifelog_logo') || null)
+  const [logoSrc, setLogoSrc]   = useState(() => localStorage.getItem('lifelog_logo') || null)
+  const [totalsMode, setTotals] = useState(false)  // false = yr/mo/d, true = yr/wk/d-total
 
   function handleLogoPick(e) {
     const file = e.target.files?.[0]
@@ -100,12 +113,14 @@ function Header({ profile }) {
     reader.readAsDataURL(file)
   }
 
-  return (
-    <header className="flex items-center justify-between px-4 shrink-0 border-b border-[#1a1a1a]"
-      style={{ paddingTop: `calc(env(safe-area-inset-top) + 12px)`, paddingBottom: 12 }}>
+  const age = profile.dob ? computeAge(profile.dob) : null
 
-      {/* Logo / app name */}
-      <label className="flex items-center gap-2 cursor-pointer group" title="Tap to upload logo">
+  return (
+    <header className="flex items-center gap-3 px-4 shrink-0 border-b border-[#1a1a1a]"
+      style={{ paddingTop: `calc(env(safe-area-inset-top) + 10px)`, paddingBottom: 10 }}>
+
+      {/* Logo upload */}
+      <label className="cursor-pointer group shrink-0" title="Tap to change logo">
         <input type="file" accept="image/*" className="hidden" onChange={handleLogoPick} />
         {logoSrc ? (
           <img src={logoSrc} alt="Life Log" className="h-7 w-7 rounded-lg object-cover" />
@@ -114,17 +129,106 @@ function Header({ profile }) {
             <span className="text-[10px] text-[#333] group-hover:text-[#a78bfa]">+</span>
           </div>
         )}
-        <span className="text-[#f0f0f0] font-light text-lg tracking-wide">Life Log</span>
       </label>
 
-      {/* User chip */}
-      <div className="flex items-center gap-1.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-full px-3 py-1.5">
-        <span className="text-[#888] text-xs">{profile.name}</span>
-        <span className="text-[#333] text-xs">·</span>
-        <span className="text-[#555] text-xs">{profile.lifeExpectancy}yr</span>
+      {/* App title + name */}
+      <div className="flex items-baseline gap-2 min-w-0 flex-1">
+        <span className="text-[#f0f0f0] font-light text-lg tracking-wide shrink-0">Life Log</span>
+        <span className="text-[#444] text-sm shrink-0">·</span>
+        <span className="text-[#555] text-xs truncate max-w-[90px]">{profile.name}</span>
       </div>
+
+      {/* Live age pill — tap to toggle between yr/mo/d and yr/wk/d-total */}
+      {age && (
+        <button
+          onClick={() => setTotals(t => !t)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            background: 'rgba(167,139,250,0.07)',
+            border: '1px solid rgba(167,139,250,0.16)',
+            borderRadius: 12,
+            padding: '5px 11px',
+            flexShrink: 0,
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <AgeStat n={age.years} u="yr" size={19} color="#a78bfa" glow />
+          <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
+
+          {totalsMode ? (
+            <>
+              <AgeStat n={age.totalWeeks.toLocaleString()} u="wk" size={14} color="#7c6fe0" />
+              <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
+              <AgeStat n={age.totalDays.toLocaleString()}  u="d"  size={12} color="#5348a8" />
+            </>
+          ) : (
+            <>
+              <AgeStat n={age.months} u="mo" size={14} color="#7c6fe0" />
+              <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
+              <AgeStat n={age.days}   u="d"  size={12} color="#5348a8" />
+            </>
+          )}
+
+          {/* Swap icon */}
+          <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ marginLeft: 2, opacity: 0.3 }}>
+            <path d="M1 3h8M7 1l2 2-2 2M9 7H1M3 5l-2 2 2 2" stroke="#a78bfa" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      )}
     </header>
   )
+}
+
+function AgeStat({ n, u, size, color, glow }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+      <span style={{
+        fontSize: size,
+        fontWeight: 700,
+        color,
+        fontVariantNumeric: 'tabular-nums',
+        letterSpacing: -0.5,
+        lineHeight: 1,
+        textShadow: glow ? `0 0 18px ${color}66` : 'none',
+      }}>{n}</span>
+      <span style={{
+        fontSize: 8,
+        fontWeight: 500,
+        color: color + '88',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+      }}>{u}</span>
+    </div>
+  )
+}
+
+function computeAge(dob) {
+  const today = new Date()
+  const birth = new Date(dob + 'T00:00:00')
+
+  // Exact breakdown: years, months, days
+  let years  = today.getFullYear() - birth.getFullYear()
+  let months = today.getMonth()    - birth.getMonth()
+  let days   = today.getDate()     - birth.getDate()
+
+  if (days < 0) {
+    months--
+    // days remaining from the previous month
+    days += new Date(today.getFullYear(), today.getMonth(), 0).getDate()
+  }
+  if (months < 0) {
+    years--
+    months += 12
+  }
+
+  // Totals
+  const totalDays  = Math.floor((today - birth) / 86400000)
+  const totalWeeks = Math.floor(totalDays / 7)
+
+  return { years, months, days, totalWeeks, totalDays }
 }
 
 /* ── Bottom nav ── */
@@ -135,6 +239,8 @@ function BottomNav({ active, onChange }) {
       style={{
         gridTemplateColumns: `repeat(${NAV.length}, 1fr)`,
         paddingBottom: 'env(safe-area-inset-bottom)',
+        position: 'relative',
+        zIndex: 50,
       }}
     >
       {NAV.map(({ id, label, icon: Icon }) => {
@@ -148,7 +254,7 @@ function BottomNav({ active, onChange }) {
             <Icon active={isActive} />
             <span
               className="text-[9px] uppercase tracking-widest font-medium transition-colors duration-150"
-              style={{ color: isActive ? '#a78bfa' : '#3a3a3a' }}
+              style={{ color: isActive ? '#a78bfa' : '#555' }}
             >
               {label}
             </span>
@@ -192,18 +298,19 @@ function ComingSoon({ tab }) {
 
 /* ── Nav icons ── */
 function GridIcon({ active }) {
+  const c = active ? '#a78bfa' : '#555'
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <rect x="2" y="2" width="7" height="7" rx="1.5" fill={active ? '#a78bfa' : '#3a3a3a'} />
-      <rect x="11" y="2" width="7" height="7" rx="1.5" fill={active ? '#a78bfa' : '#2a2a2a'} />
-      <rect x="2" y="11" width="7" height="7" rx="1.5" fill={active ? '#a78bfa' : '#2a2a2a'} />
-      <rect x="11" y="11" width="7" height="7" rx="1.5" fill={active ? '#a78bfa' : '#2a2a2a'} />
+      <rect x="2" y="2" width="7" height="7" rx="1.5" fill={c} />
+      <rect x="11" y="2" width="7" height="7" rx="1.5" fill={c} opacity={active ? 1 : 0.7} />
+      <rect x="2" y="11" width="7" height="7" rx="1.5" fill={c} opacity={active ? 1 : 0.7} />
+      <rect x="11" y="11" width="7" height="7" rx="1.5" fill={c} opacity={active ? 1 : 0.7} />
     </svg>
   )
 }
 
 function TodayIcon({ active }) {
-  const c = active ? '#a78bfa' : '#3a3a3a'
+  const c = active ? '#a78bfa' : '#555'
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <rect x="3" y="4" width="14" height="13" rx="2" stroke={c} strokeWidth="1.5" />
@@ -214,20 +321,20 @@ function TodayIcon({ active }) {
   )
 }
 
-function AIIcon({ active }) {
-  const c = active ? '#a78bfa' : '#3a3a3a'
+function InsightsIcon({ active }) {
+  const c = active ? '#a78bfa' : '#555'
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-      <path d="M4 14.5C4 14.5 3 17 2 18c1.5-.5 3.5-1.5 4.5-2H15a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v7.5c0 1.1.9 2 2 2h-.5z" stroke={c} strokeWidth="1.5" strokeLinejoin="round" />
-      <circle cx="7" cy="9" r="1" fill={c} />
-      <circle cx="10" cy="9" r="1" fill={c} />
-      <circle cx="13" cy="9" r="1" fill={c} />
+      <path d="M2 15l4.5-5.5 4 3.5 4-6 3.5 3" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="6.5" cy="9.5"  r="1.5" fill={c} opacity={active ? 1 : 0.7} />
+      <circle cx="10.5" cy="13" r="1.5" fill={c} opacity={active ? 1 : 0.7} />
+      <circle cx="14.5" cy="7"  r="1.5" fill={c} opacity={active ? 1 : 0.7} />
     </svg>
   )
 }
 
 function TasksIcon({ active }) {
-  const c = active ? '#a78bfa' : '#3a3a3a'
+  const c = active ? '#a78bfa' : '#555'
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <rect x="2" y="2" width="7" height="7" rx="1" stroke={c} strokeWidth="1.5" />
@@ -239,7 +346,7 @@ function TasksIcon({ active }) {
 }
 
 function SettingsIcon({ active }) {
-  const c = active ? '#a78bfa' : '#3a3a3a'
+  const c = active ? '#a78bfa' : '#555'
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <circle cx="10" cy="10" r="2.5" stroke={c} strokeWidth="1.5" />

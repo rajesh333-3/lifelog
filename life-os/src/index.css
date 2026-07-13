@@ -85,6 +85,20 @@ body {
   animation: shimmer 1.6s ease-in-out infinite;
 }
 
+/* Single-square highlight on grid hover — purple overlay via pseudo-element */
+[data-week] {
+  cursor: pointer;
+}
+[data-week]:hover::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 3px;
+  background: rgba(167, 139, 250, 0.28);
+  pointer-events: none;
+  z-index: 5;
+}
+
 /* Glass card — used by tooltips */
 .glass {
   background: rgba(14, 14, 14, 0.92);
