@@ -62,7 +62,7 @@ export function Onboarding({ onComplete }) {
           className="w-full max-w-md"
         >
           {current === 'welcome' && (
-            <Step title="Life OS" subtitle={`"Don't fill your calendar.\nFill your weeks."`}>
+            <Step title="Life Log" subtitle={`"Don't fill your calendar.\nFill your weeks."`}>
               <p className="text-[#888] text-center text-sm mt-4">
                 A personal operating system that answers one question visually:<br />
                 <span className="text-[#f0f0f0]">how am I actually spending my weeks?</span>

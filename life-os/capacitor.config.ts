@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.rajeshtvd.lifeos',
-  appName: 'Life OS',
+  appName: 'Life Log',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

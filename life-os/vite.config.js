@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png'],
       manifest: {
-        name: 'Life OS',
-        short_name: 'LifeOS',
+        name: 'Life Log',
+        short_name: 'LifeLog',
         description: 'Your personal life operating system',
         theme_color: '#0a0a0a',
         background_color: '#0a0a0a',
