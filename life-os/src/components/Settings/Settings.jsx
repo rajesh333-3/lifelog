@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSettingsStore } from '../../store/useSettingsStore'
 import { useLLM } from '../AIChat/useLLM'
+import { getHabits, saveHabits } from '../../db'
 
 const PILLAR_META = [
   { key: 'physical', label: 'Physical', icon: '💪', color: '#4ade80' },
@@ -20,16 +21,17 @@ export function Settings() {
         <p className="text-[#444] text-xs mt-0.5">Profile, AI, pillars & reminders</p>
       </div>
 
-      {/* Section tabs */}
-      <div className="flex gap-1 px-3 pt-3 pb-0 shrink-0">
+      {/* Section tabs — horizontally scrollable so 5 fit */}
+      <div className="flex gap-1 px-3 pt-3 pb-0 shrink-0 overflow-x-auto no-scrollbar">
         {[
           { id: 'profile',   label: 'Profile'   },
           { id: 'ai',        label: 'AI'        },
           { id: 'pillars',   label: 'Pillars'   },
+          { id: 'habits',    label: 'Habits'    },
           { id: 'reminders', label: 'Reminders' },
         ].map(({ id, label }) => (
           <button key={id} onClick={() => setSection(id)}
-            className="flex-1 py-2 text-xs font-medium rounded-xl transition-all"
+            className="shrink-0 py-2 px-3 text-xs font-medium rounded-xl transition-all"
             style={{
               background: section === id ? '#1e1e1e' : 'transparent',
               color:      section === id ? '#a78bfa' : '#444',
@@ -47,6 +49,7 @@ export function Settings() {
           {section === 'profile'   && <ProfileSection   key="profile"   />}
           {section === 'ai'        && <AISection        key="ai"        />}
           {section === 'pillars'   && <PillarsSection   key="pillars"   />}
+          {section === 'habits'    && <HabitsSettings   key="habits"    />}
           {section === 'reminders' && <RemindersSection key="reminders" />}
         </AnimatePresence>
       </div>
@@ -348,6 +351,211 @@ function GoalInput({ color, onAdd }) {
         Add
       </button>
     </div>
+  )
+}
+
+/* ══════════ Habits Settings ══════════ */
+
+const HABIT_EMOJIS = [
+  '🏃','🏋️','🧘','🚴','🏊','💪','🥗','😴',
+  '📚','🎵','✍️','💭','🎨','🤝','🎮','🧩',
+  '💼','📊','🎯','📝','💡','⏰','📅','🚀',
+  '💧','🌿','🧹','🙏','⭐','🔥','🫁','🛌',
+]
+
+const PILLAR_OPTIONS = [
+  { key: 'physical', label: 'Physical', color: '#4ade80' },
+  { key: 'mental',   label: 'Mental',   color: '#60a5fa' },
+  { key: 'work',     label: 'Work',     color: '#fbbf24' },
+]
+
+function HabitsSettings() {
+  const [habits,  setHabits]  = useState([])
+  const [adding,  setAdding]  = useState(false)
+  const [name,    setName]    = useState('')
+  const [emoji,   setEmoji]   = useState('⭐')
+  const [pillar,  setPillar]  = useState('physical')
+
+  useEffect(() => { getHabits().then(setHabits) }, [])
+
+  async function persist(next) {
+    setHabits(next)
+    await saveHabits(next)
+  }
+
+  async function add() {
+    if (!name.trim()) return
+    const habit = {
+      id:     `h-${habits.length + 1}-${name.slice(0,3).toLowerCase()}`,
+      name:   name.trim(),
+      emoji,
+      pillar,
+      active: true,
+    }
+    await persist([...habits, habit])
+    setName(''); setEmoji('⭐'); setPillar('physical'); setAdding(false)
+  }
+
+  async function remove(id) {
+    await persist(habits.filter(h => h.id !== id))
+  }
+
+  async function toggleActive(id) {
+    await persist(habits.map(h => h.id === id ? { ...h, active: !h.active } : h))
+  }
+
+  return (
+    <Section>
+      <p className="text-[#444] text-xs px-1 leading-relaxed">
+        Habits appear as quick-tap chips in your daily view. Each is linked to a pillar.
+      </p>
+
+      {/* Habit list */}
+      {habits.length > 0 && (
+        <Card>
+          <AnimatePresence initial={false}>
+            {habits.map((habit, i) => {
+              const color = PILLAR_OPTIONS.find(p => p.key === habit.pillar)?.color ?? '#a78bfa'
+              return (
+                <motion.div
+                  key={habit.id}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex items-center gap-3 px-4 py-3 border-b border-[#1a1a1a] last:border-0"
+                >
+                  <span className="text-lg leading-none shrink-0">{habit.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-[#e0e0e0] truncate">{habit.name}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+                      <span className="text-[9px] text-[#444] uppercase tracking-widest capitalize">
+                        {habit.pillar}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Active toggle */}
+                  <button
+                    onClick={() => toggleActive(habit.id)}
+                    className="w-10 h-6 rounded-full flex items-center px-0.5 shrink-0 transition-colors"
+                    style={{
+                      background: habit.active !== false ? color + '33' : '#1a1a1a',
+                      border:     `1px solid ${habit.active !== false ? color + '55' : '#2a2a2a'}`,
+                    }}
+                  >
+                    <motion.div
+                      className="w-4 h-4 rounded-full"
+                      style={{ background: habit.active !== false ? color : '#333' }}
+                      animate={{ x: habit.active !== false ? 16 : 0 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    />
+                  </button>
+                  {/* Delete */}
+                  <button
+                    onClick={() => remove(habit.id)}
+                    className="w-7 h-7 flex items-center justify-center text-[#333] hover:text-[#f87171] transition-colors shrink-0 text-lg leading-none"
+                  >×</button>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
+        </Card>
+      )}
+
+      {/* Add form */}
+      <AnimatePresence>
+        {adding ? (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            <Card>
+              {/* Name */}
+              <div className="px-4 py-3 border-b border-[#1a1a1a]">
+                <input
+                  autoFocus
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && add()}
+                  placeholder="Habit name…"
+                  className="w-full bg-transparent text-sm text-[#f0f0f0] placeholder:text-[#333] focus:outline-none"
+                />
+              </div>
+              {/* Emoji picker */}
+              <div className="px-4 py-3 border-b border-[#1a1a1a]">
+                <p className="text-[9px] text-[#444] uppercase tracking-widest mb-2">Emoji</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {HABIT_EMOJIS.map(e => (
+                    <button
+                      key={e}
+                      onClick={() => setEmoji(e)}
+                      className="w-8 h-8 text-lg rounded-lg flex items-center justify-center transition-all"
+                      style={{
+                        background: emoji === e ? '#a78bfa22' : 'transparent',
+                        border:     `1px solid ${emoji === e ? '#a78bfa44' : 'transparent'}`,
+                      }}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Pillar selector */}
+              <div className="px-4 py-3">
+                <p className="text-[9px] text-[#444] uppercase tracking-widest mb-2">Pillar</p>
+                <div className="flex gap-2">
+                  {PILLAR_OPTIONS.map(p => (
+                    <button
+                      key={p.key}
+                      onClick={() => setPillar(p.key)}
+                      className="flex-1 py-2 rounded-xl text-xs font-medium transition-all"
+                      style={{
+                        background: pillar === p.key ? p.color + '22' : 'transparent',
+                        color:      pillar === p.key ? p.color : '#444',
+                        border:     `1px solid ${pillar === p.key ? p.color + '44' : '#1e1e1e'}`,
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Actions */}
+              <div className="flex gap-2 px-4 pb-4">
+                <button
+                  onClick={add}
+                  disabled={!name.trim()}
+                  className="flex-1 bg-[#a78bfa] text-[#0a0a0a] text-sm font-semibold rounded-xl py-3 disabled:opacity-30 active:opacity-80"
+                >
+                  Add habit
+                </button>
+                <button
+                  onClick={() => { setAdding(false); setName('') }}
+                  className="px-4 border border-[#2a2a2a] rounded-xl text-[#555] text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </Card>
+          </motion.div>
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            className="w-full py-3.5 rounded-2xl text-sm font-medium border border-dashed border-[#2a2a2a] text-[#444] hover:border-[#a78bfa] hover:text-[#a78bfa] transition-colors active:opacity-70"
+          >
+            + Add habit
+          </button>
+        )}
+      </AnimatePresence>
+
+      {habits.length === 0 && !adding && (
+        <p className="text-[#333] text-xs text-center px-2">
+          No habits yet. Add ones you want to track daily — exercise, reading, deep work…
+        </p>
+      )}
+    </Section>
   )
 }
 

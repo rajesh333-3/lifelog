@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   ResponsiveContainer, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts'
 import { db } from '../../db'
 import { AIChat } from '../AIChat/AIChat'
+import { useLLM } from '../AIChat/useLLM'
+import { useSettingsStore } from '../../store/useSettingsStore'
 
 const PERIODS = [
   { label: '7d',  days: 7  },
@@ -219,6 +222,9 @@ function StatsView({ period, onPeriodChange }) {
           ))}
         </div>
 
+        {/* AI Weekly Narrative */}
+        <NarrativeCard />
+
         {/* Stat cards */}
         <div className="grid grid-cols-3 gap-2">
           {stats.map(s => (
@@ -368,6 +374,184 @@ function HighlightCard({ label, date, score, color }) {
       <span className="text-[9px] uppercase tracking-widest" style={{ color: color + 'aa' }}>{label}</span>
       <span className="text-[22px] font-bold tabular-nums leading-none" style={{ color }}>{score}</span>
       <span className="text-[10px]" style={{ color: color + '88' }}>{fmt}</span>
+    </div>
+  )
+}
+
+/* ── AI Weekly Narrative ── */
+
+function getWeekMonday() {
+  const d   = new Date()
+  const day = d.getDay()                    // 0=Sun … 6=Sat
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
+  return localDateStr(d)
+}
+
+function buildWeekContext(days, profileName) {
+  const last7 = [...days].sort((a, b) => a.date.localeCompare(b.date)).slice(-7)
+
+  if (!last7.length) return null
+
+  const lines = last7.map(d => {
+    const parts = []
+    if (d.physical      != null) parts.push(`physical ${d.physical}/100`)
+    if (d.mental        != null) parts.push(`mental ${d.mental}/100`)
+    if (d.work          != null) parts.push(`work ${d.work}/100`)
+    if (d.wentWell)              parts.push(`went well: "${d.wentWell}"`)
+    if (d.couldBeBetter)         parts.push(`could improve: "${d.couldBeBetter}"`)
+    if (d.lifeEvent && d.lifeEventNote) parts.push(`life event: "${d.lifeEventNote}"`)
+    return parts.length ? `${d.date}: ${parts.join(', ')}` : null
+  }).filter(Boolean)
+
+  if (!lines.length) return null
+
+  return `Here is ${profileName}'s week:\n${lines.join('\n')}\n\nWrite their weekly narrative now.`
+}
+
+export function NarrativeCard() {
+  const profile   = useSettingsStore(s => s.profile)
+  const { chat, provider } = useLLM()
+
+  const weekMonday = getWeekMonday()
+  const cacheKey   = `narrative-${weekMonday}`
+  const cutoff     = nDaysAgo(7)
+
+  const days = useLiveQuery(
+    () => db.days.where('date').aboveOrEqual(cutoff).sortBy('date'),
+    [cutoff]
+  ) ?? []
+
+  const cached = useLiveQuery(
+    () => db.chatLogs.get(cacheKey),
+    [cacheKey]
+  )
+
+  const [narrative, setNarrative] = useState(null)
+  const [loading,   setLoading]   = useState(false)
+  const [error,     setError]     = useState(null)
+
+  // Use cached value once loaded
+  const displayed = narrative ?? cached?.narrative ?? null
+
+  async function generate() {
+    const ctx = buildWeekContext(days, profile?.name ?? 'you')
+    if (!ctx) return
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await chat(
+        [{ role: 'user', content: ctx }],
+        `You are a warm, introspective personal journal narrator.
+Write exactly 3 sentences in first person ("This week, I…") that tell the story of ${profile?.name ?? 'the user'}'s week.
+Be specific — reference actual scores, themes, or reflections from the data.
+No bullet points, no headers, no emojis. Just flowing, human prose. Under 75 words total.`
+      )
+      setNarrative(result)
+      await db.chatLogs.put({ date: cacheKey, narrative: result, generatedAt: localDateStr(new Date()) })
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const hasEnoughData = days.filter(d =>
+    d.physical != null || d.mental != null || d.work != null
+  ).length >= 2
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{ background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.12)' }}
+    >
+      {/* Header row */}
+      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#a78bfa]" />
+          <span className="text-[10px] text-[#a78bfa] uppercase tracking-widest font-semibold">
+            Weekly Narrative
+          </span>
+          <span className="text-[9px] text-[#444]">
+            {weekMonday.slice(5).replace('-', '/')}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {/* Provider dot */}
+          <div className={`w-1.5 h-1.5 rounded-full ${provider === 'ollama' ? 'bg-[#4ade80]' : provider === 'gemini' ? 'bg-[#60a5fa]' : 'bg-[#333]'}`} />
+          {(displayed || !hasEnoughData) ? null : null}
+          <button
+            onClick={generate}
+            disabled={loading || !hasEnoughData}
+            className="text-[10px] font-semibold px-2.5 py-1 rounded-full transition-all disabled:opacity-30 active:scale-95"
+            style={{
+              color:      '#a78bfa',
+              background: 'rgba(167,139,250,0.12)',
+              border:     '1px solid rgba(167,139,250,0.2)',
+            }}
+          >
+            {loading ? '…' : displayed ? 'Refresh' : 'Generate'}
+          </button>
+        </div>
+      </div>
+
+      <div className="h-px mx-4" style={{ background: 'rgba(167,139,250,0.1)' }} />
+
+      {/* Body */}
+      <div className="px-4 py-3 min-h-[60px] flex items-start">
+        <AnimatePresence mode="wait">
+          {loading ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex gap-1.5 items-center py-1"
+            >
+              {[0, 1, 2].map(i => (
+                <motion.div
+                  key={i}
+                  className="w-1.5 h-1.5 rounded-full bg-[#a78bfa]"
+                  animate={{ opacity: [0.3, 1, 0.3] }}
+                  transition={{ duration: 1, repeat: Infinity, delay: i * 0.22 }}
+                />
+              ))}
+              <span className="text-[11px] text-[#555] ml-1">Writing your week's story…</span>
+            </motion.div>
+          ) : error ? (
+            <motion.p
+              key="error"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="text-[11px] text-[#f87171] leading-relaxed"
+            >
+              {error.includes('No LLM') ? 'Configure an AI provider in Settings → AI.' : error}
+            </motion.p>
+          ) : displayed ? (
+            <motion.p
+              key="narrative"
+              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.35 }}
+              className="text-[13px] text-[#c0c0c0] leading-relaxed"
+            >
+              {displayed}
+            </motion.p>
+          ) : (
+            <motion.p
+              key="empty"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="text-[11px] text-[#444] leading-relaxed"
+            >
+              {hasEnoughData
+                ? 'Tap Generate to get your week\'s story written by AI.'
+                : 'Log at least 2 days this week to unlock your narrative.'}
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Cached date footer */}
+      {cached?.generatedAt && !loading && (
+        <p className="text-[9px] text-[#2a2a2a] px-4 pb-2.5">
+          Generated {cached.generatedAt}
+        </p>
+      )}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { DayView } from './components/DayView/DayView'
 import { InsightsView } from './components/Insights/InsightsView'
 import { EisenhowerBoard } from './components/Eisenhower/EisenhowerBoard'
 import { Settings } from './components/Settings/Settings'
+import { CalendarTrigger, CalendarPicker } from './components/Calendar/CalendarPicker'
 import { todayStr } from './utils/dateUtils'
 
 const NAV = [
@@ -98,87 +99,119 @@ export default function App() {
 
 /* ── Header ── */
 function Header({ profile }) {
-  const [logoSrc, setLogoSrc]   = useState(() => localStorage.getItem('lifelog_logo') || null)
-  const [totalsMode, setTotals] = useState(false)  // false = yr/mo/d, true = yr/wk/d-total
+  const [totalsMode, setTotals] = useState(false)
+  const [calOpen, setCalOpen]   = useState(false)
 
-  function handleLogoPick(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => {
-      const src = ev.target.result
-      setLogoSrc(src)
-      localStorage.setItem('lifelog_logo', src)
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const age = profile.dob ? computeAge(profile.dob) : null
+  const age       = profile.dob ? computeAge(profile.dob) : null
+  const firstName = profile.name?.split(' ')[0] ?? profile.name
 
   return (
-    <header className="flex items-center gap-3 px-4 shrink-0 border-b border-[#1a1a1a]"
-      style={{ paddingTop: `calc(env(safe-area-inset-top) + 10px)`, paddingBottom: 10 }}>
+    <>
+      <header className="flex items-center gap-3 px-4 shrink-0 border-b border-[#1a1a1a]"
+        style={{ paddingTop: `calc(env(safe-area-inset-top) + 10px)`, paddingBottom: 10 }}>
 
-      {/* Logo upload */}
-      <label className="cursor-pointer group shrink-0" title="Tap to change logo">
-        <input type="file" accept="image/*" className="hidden" onChange={handleLogoPick} />
-        {logoSrc ? (
-          <img src={logoSrc} alt="Life Log" className="h-7 w-7 rounded-lg object-cover" />
-        ) : (
-          <div className="h-7 w-7 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] border-dashed flex items-center justify-center group-hover:border-[#a78bfa] transition-colors">
-            <span className="text-[10px] text-[#333] group-hover:text-[#a78bfa]">+</span>
-          </div>
-        )}
-      </label>
-
-      {/* App title + name */}
-      <div className="flex items-baseline gap-2 min-w-0 flex-1">
-        <span className="text-[#f0f0f0] font-light text-lg tracking-wide shrink-0">Life Log</span>
-        <span className="text-[#444] text-sm shrink-0">·</span>
-        <span className="text-[#555] text-xs truncate max-w-[90px]">{profile.name}</span>
-      </div>
-
-      {/* Live age pill — tap to toggle between yr/mo/d and yr/wk/d-total */}
-      {age && (
-        <button
-          onClick={() => setTotals(t => !t)}
+        {/* App logo */}
+        <img
+          src="/icons/icon-192.png"
+          alt="Life Log"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            background: 'rgba(167,139,250,0.07)',
-            border: '1px solid rgba(167,139,250,0.16)',
-            borderRadius: 12,
-            padding: '5px 11px',
-            flexShrink: 0,
-            cursor: 'pointer',
-            WebkitTapHighlightColor: 'transparent',
+            width:        38,
+            height:       38,
+            borderRadius: 11,
+            objectFit:    'cover',
+            flexShrink:   0,
+            boxShadow:    '0 0 0 1px rgba(167,139,250,0.15), 0 2px 12px rgba(167,139,250,0.2)',
           }}
-        >
-          <AgeStat n={age.years} u="yr" size={19} color="#a78bfa" glow />
-          <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
+        />
 
-          {totalsMode ? (
-            <>
-              <AgeStat n={age.totalWeeks.toLocaleString()} u="wk" size={14} color="#7c6fe0" />
-              <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
-              <AgeStat n={age.totalDays.toLocaleString()}  u="d"  size={12} color="#5348a8" />
-            </>
-          ) : (
-            <>
-              <AgeStat n={age.months} u="mo" size={14} color="#7c6fe0" />
-              <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
-              <AgeStat n={age.days}   u="d"  size={12} color="#5348a8" />
-            </>
-          )}
+        {/* Brand · username */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span style={{
+            fontFamily:    "'Outfit', system-ui, sans-serif",
+            fontSize:      18,
+            fontWeight:    800,
+            color:         '#f0f0f0',
+            letterSpacing: '-0.6px',
+            lineHeight:    1,
+            flexShrink:    0,
+          }}>
+            Life Log
+          </span>
 
-          {/* Swap icon */}
-          <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ marginLeft: 2, opacity: 0.3 }}>
-            <path d="M1 3h8M7 1l2 2-2 2M9 7H1M3 5l-2 2 2 2" stroke="#a78bfa" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-      )}
-    </header>
+          {/* Bullet separator */}
+          <span style={{
+            width:        5,
+            height:       5,
+            borderRadius: '50%',
+            background:   'rgba(167,139,250,0.45)',
+            flexShrink:   0,
+            marginBottom: 1,
+          }} />
+
+          {/* First name — Outfit light italic, purple tint */}
+          <span
+            className="truncate"
+            style={{
+              fontFamily:    "'Outfit', system-ui, sans-serif",
+              fontSize:      14,
+              fontWeight:    300,
+              fontStyle:     'italic',
+              color:         '#c4b5fd',
+              letterSpacing: '0.1px',
+              lineHeight:    1,
+              minWidth:      0,
+            }}
+          >
+            {firstName}
+          </span>
+        </div>
+
+        {/* Calendar trigger */}
+        <CalendarTrigger dob={profile.dob} onOpen={() => setCalOpen(true)} />
+
+        {/* Live age pill */}
+        {age && (
+          <button
+            onClick={() => setTotals(t => !t)}
+            style={{
+              display:                 'flex',
+              alignItems:              'center',
+              gap:                     8,
+              background:              'rgba(167,139,250,0.07)',
+              border:                  '1px solid rgba(167,139,250,0.16)',
+              borderRadius:            12,
+              padding:                 '5px 11px',
+              flexShrink:              0,
+              cursor:                  'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <AgeStat n={age.years} u="yr" size={19} color="#a78bfa" glow />
+            <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
+
+            {totalsMode ? (
+              <>
+                <AgeStat n={age.totalWeeks.toLocaleString()} u="wk" size={14} color="#7c6fe0" />
+                <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
+                <AgeStat n={age.totalDays.toLocaleString()}  u="d"  size={12} color="#5348a8" />
+              </>
+            ) : (
+              <>
+                <AgeStat n={age.months} u="mo" size={14} color="#7c6fe0" />
+                <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
+                <AgeStat n={age.days}   u="d"  size={12} color="#5348a8" />
+              </>
+            )}
+
+            <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ marginLeft: 2, opacity: 0.3 }}>
+              <path d="M1 3h8M7 1l2 2-2 2M9 7H1M3 5l-2 2 2 2" stroke="#a78bfa" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
+      </header>
+
+      <CalendarPicker dob={profile.dob} open={calOpen} onClose={() => setCalOpen(false)} />
+    </>
   )
 }
 

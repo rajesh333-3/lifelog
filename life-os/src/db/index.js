@@ -2,6 +2,19 @@ import Dexie from 'dexie'
 
 export const db = new Dexie('LifeOS')
 
+// v3 → v4: habits system
+// habits list stored in settings key 'habits': [{ id, name, emoji, pillar, active }]
+// habitLogs: absence = not done; presence = done for that [date, habitId]
+db.version(4).stores({
+  days:      'date, weekId',
+  weeks:     'weekId',
+  todos:     '++id, quadrant, type, createdDate, completedDate, dueDate',
+  hobbies:   '++id, priority',
+  settings:  'key',
+  chatLogs:  'date',
+  habitLogs: '[date+habitId], date, habitId',
+})
+
 // v2 → v3: todos gain createdDate + completedDate indexes (date kept for compat)
 db.version(3).stores({
   days:     'date, weekId',
@@ -67,4 +80,29 @@ export async function tasksForDate(date) {
 // Returns all open tasks (for Eisenhower board)
 export async function openTasks() {
   return db.todos.where('type').equals('task').filter(t => !t.done).toArray()
+}
+
+// ── Habit helpers ──────────────────────────────────────────────────────────
+
+export async function getHabits() {
+  const row = await db.settings.get('habits')
+  return row?.value ?? []
+}
+
+export async function saveHabits(habits) {
+  await db.settings.put({ key: 'habits', value: habits })
+}
+
+// Returns Set of habitIds that are done on a given date
+export async function habitsDoneOnDate(date) {
+  const logs = await db.habitLogs.where('date').equals(date).toArray()
+  return new Set(logs.map(l => l.habitId))
+}
+
+export async function setHabitDone(date, habitId, done) {
+  if (done) {
+    await db.habitLogs.put({ date, habitId })
+  } else {
+    await db.habitLogs.delete([date, habitId])
+  }
 }

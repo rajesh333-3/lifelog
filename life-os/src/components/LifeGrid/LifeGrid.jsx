@@ -16,7 +16,8 @@ export function LifeGrid({ dob, lifeExpectancy }) {
   const currentIdx  = currentWeekIndex(dob)
   const currentRef  = useRef(null)
   const hideTimer   = useRef(null)
-  const openDayView = useAppStore(s => s.openDayView)
+  const openDayView          = useAppStore(s => s.openDayView)
+  const setCalendarWeekIndex = useAppStore(s => s.setCalendarWeekIndex)
 
   const lockedRef  = useRef(false)
   const hoveredRef = useRef(null)
@@ -72,12 +73,17 @@ export function LifeGrid({ dob, lifeExpectancy }) {
     const h = { index, anchorEl: dotEl }
     hoveredRef.current = h
     setHovered(h)
-  }, [])
+    setCalendarWeekIndex(index)
+  }, [setCalendarWeekIndex])
 
   const handleMouseLeave = useCallback(() => {
     if (lockedRef.current) return
-    hideTimer.current = setTimeout(() => { hoveredRef.current = null; setHovered(null) }, 220)
-  }, [])
+    hideTimer.current = setTimeout(() => {
+      hoveredRef.current = null
+      setHovered(null)
+      setCalendarWeekIndex(null)
+    }, 220)
+  }, [setCalendarWeekIndex])
 
   const handleClick = useCallback((e) => {
     const dotEl = e.target.closest('[data-week]')

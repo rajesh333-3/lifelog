@@ -13,6 +13,8 @@ import { PillarSlider } from './PillarSlider'
 import { PillarReadOnly } from './PillarReadOnly'
 import { TaskSection } from './TaskSection'
 import { HobbySection } from './HobbySection'
+import { HabitsSection } from './HabitsSection'
+import { useVoiceInput } from '../Voice/useVoiceInput'
 
 const SLIDE = {
   initial:    { x: '100%', opacity: 0 },
@@ -51,6 +53,7 @@ export function DayView({ initialDate, asOverlay = false }) {
       couldBeBetter: dayData.couldBeBetter ?? '',
       lifeEvent:     dayData.lifeEvent     ?? false,
       lifeEventNote: dayData.lifeEventNote ?? '',
+      voiceNote:     dayData.voiceNote     ?? '',
     } : emptyDay())
   }, [date, dayData?.date])
 
@@ -213,8 +216,18 @@ export function DayView({ initialDate, asOverlay = false }) {
               </Section>
             )}
 
+            {local.voiceNote && (
+              <Section title="Voice Journal">
+                <ReadOnlyCard label="🎙 Voice note" text={local.voiceNote} />
+              </Section>
+            )}
+
             <Section title="Tasks">
               <TaskSection date={date} readOnly />
+            </Section>
+
+            <Section title="Habits">
+              <HabitsSection date={date} readOnly />
             </Section>
 
             <LifeEventSection
@@ -255,8 +268,19 @@ export function DayView({ initialDate, asOverlay = false }) {
               </div>
             </Section>
 
+            <Section title="Voice Journal">
+              <VoiceJournal
+                value={local.voiceNote}
+                onChange={v => update('voiceNote', v)}
+              />
+            </Section>
+
             <Section title="Tasks">
               <TaskSection date={date} />
+            </Section>
+
+            <Section title="Habits">
+              <HabitsSection date={date} />
             </Section>
 
             <Section title="Hobbies">
@@ -392,18 +416,52 @@ function Section({ title, children }) {
   )
 }
 
-/* ── Editable reflection textarea ── */
+/* ── Editable reflection textarea with inline mic ── */
 function ReflectField({ label, value, onChange, placeholder }) {
+  const { listening, interim, toggle } = useVoiceInput()
+
+  function handleFinal(text) {
+    onChange(value ? `${value} ${text}` : text)
+  }
+
   return (
-    <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-3 flex flex-col">
-      <p className="text-[#444] text-[9px] uppercase tracking-widest mb-1.5">{label}</p>
+    <div className="bg-[#111] border border-[#1e1e1e] rounded-xl p-3 flex flex-col"
+      style={{ borderColor: listening ? 'rgba(167,139,250,0.3)' : '' }}>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-[#444] text-[9px] uppercase tracking-widest">{label}</p>
+        <button
+          onClick={() => toggle(handleFinal)}
+          className="w-5 h-5 rounded-full flex items-center justify-center transition-all active:scale-90 shrink-0"
+          style={{
+            background: listening ? 'rgba(248,113,113,0.2)' : 'transparent',
+            border:     `1px solid ${listening ? 'rgba(248,113,113,0.5)' : '#2a2a2a'}`,
+          }}
+        >
+          {listening ? (
+            <motion.div
+              className="w-2 h-2 rounded-full bg-[#f87171]"
+              animate={{ scale: [1, 1.3, 1] }}
+              transition={{ duration: 0.7, repeat: Infinity }}
+            />
+          ) : (
+            <svg width="8" height="9" viewBox="0 0 8 10" fill="none">
+              <rect x="2.5" y="0.5" width="3" height="5" rx="1.5" stroke="#555" strokeWidth="1.1"/>
+              <path d="M1 5c0 1.65 1.35 3 3 3s3-1.35 3-3" stroke="#555" strokeWidth="1.1" strokeLinecap="round"/>
+              <line x1="4" y1="8" x2="4" y2="9.5" stroke="#555" strokeWidth="1.1" strokeLinecap="round"/>
+            </svg>
+          )}
+        </button>
+      </div>
       <textarea
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={listening ? interim || 'Listening…' : placeholder}
         rows={3}
-        className="flex-1 w-full bg-transparent text-[#e0e0e0] text-xs placeholder:text-[#222] resize-none focus:outline-none leading-relaxed"
+        className="flex-1 w-full bg-transparent text-[#e0e0e0] text-xs placeholder:text-[#444] resize-none focus:outline-none leading-relaxed"
       />
+      {interim && (
+        <p className="text-[10px] text-[#555] italic mt-1">{interim}…</p>
+      )}
     </div>
   )
 }
@@ -431,6 +489,114 @@ function PastNotice() {
   )
 }
 
+/* ── Voice Journal ── */
+function VoiceJournal({ value, onChange }) {
+  const { listening, interim, supported, toggle } = useVoiceInput()
+
+  function handleFinal(text) {
+    onChange(value ? `${value} ${text}` : text)
+  }
+
+  const wordCount = value.trim() ? value.trim().split(/\s+/).length : 0
+
+  if (supported === false) {
+    return (
+      <div className="bg-[#111] border border-[#1e1e1e] rounded-2xl px-4 py-3">
+        <p className="text-[#444] text-xs">
+          Voice input not supported in this browser. Type your note below.
+        </p>
+        <textarea
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="Free-form notes…"
+          rows={3}
+          className="w-full bg-transparent text-[#e0e0e0] text-sm mt-2 placeholder:text-[#222] resize-none focus:outline-none leading-relaxed"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="bg-[#111] rounded-2xl overflow-hidden transition-all"
+      style={{ border: `1px solid ${listening ? 'rgba(167,139,250,0.35)' : '#1e1e1e'}` }}
+    >
+      {/* Text area */}
+      <textarea
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={listening ? '' : 'Tap 🎙 to dictate, or type freely…'}
+        rows={3}
+        className="w-full bg-transparent text-[#e0e0e0] text-sm px-4 pt-3 pb-1 placeholder:text-[#2a2a2a] resize-none focus:outline-none leading-relaxed"
+      />
+
+      {/* Interim transcript — appears dimly while speaking */}
+      {interim && (
+        <p className="px-4 pb-1 text-sm text-[#555] italic leading-relaxed">{interim}…</p>
+      )}
+
+      {/* Bottom bar */}
+      <div className="flex items-center justify-between px-4 pb-3 pt-1">
+        <div className="flex items-center gap-2">
+          {listening ? (
+            <motion.div
+              className="flex items-center gap-1.5"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            >
+              <motion.div
+                className="w-2 h-2 rounded-full bg-[#f87171]"
+                animate={{ scale: [1, 1.4, 1] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+              />
+              <span className="text-[11px] text-[#f87171] font-medium">Listening…</span>
+            </motion.div>
+          ) : (
+            <span className="text-[10px] text-[#333]">
+              {wordCount > 0 ? `${wordCount} word${wordCount !== 1 ? 's' : ''}` : 'Voice or type'}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {value && !listening && (
+            <button
+              onClick={() => onChange('')}
+              className="text-[10px] text-[#333] hover:text-[#f87171] transition-colors px-2 py-1"
+            >
+              Clear
+            </button>
+          )}
+          <button
+            onClick={() => toggle(handleFinal)}
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90"
+            style={{
+              background: listening
+                ? 'rgba(248,113,113,0.15)'
+                : 'rgba(167,139,250,0.12)',
+              border: `1px solid ${listening ? 'rgba(248,113,113,0.4)' : 'rgba(167,139,250,0.25)'}`,
+              boxShadow: listening ? '0 0 20px rgba(248,113,113,0.25)' : 'none',
+            }}
+          >
+            {listening ? (
+              /* Stop square */
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <rect x="1" y="1" width="8" height="8" rx="1.5" fill="#f87171"/>
+              </svg>
+            ) : (
+              /* Mic */
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="#a78bfa" strokeWidth="1.3"/>
+                <path d="M2 7c0 2.76 2.24 5 5 5s5-2.24 5-5" stroke="#a78bfa" strokeWidth="1.3" strokeLinecap="round"/>
+                <line x1="7" y1="12" x2="7" y2="13.5" stroke="#a78bfa" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Default empty day state ── */
 function emptyDay() {
   return {
@@ -438,5 +604,6 @@ function emptyDay() {
     physicalNote: '', mentalNote: '', workNote: '',
     wentWell: '', couldBeBetter: '',
     lifeEvent: false, lifeEventNote: '',
+    voiceNote: '',
   }
 }

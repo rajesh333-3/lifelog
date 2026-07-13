@@ -14,4 +14,8 @@ export const useAppStore = create((set) => ({
 
   hoveredWeek: null,
   setHoveredWeek: (weekId) => set({ hoveredWeek: weekId }),
+
+  // Index of the grid week currently under the cursor — drives the calendar highlight
+  calendarWeekIndex: null,
+  setCalendarWeekIndex: (idx) => set({ calendarWeekIndex: idx }),
 }))
