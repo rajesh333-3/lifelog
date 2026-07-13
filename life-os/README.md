@@ -48,7 +48,8 @@ These features are visible in the UI but not yet active. A notice is shown in th
 |---|---|---|
 | **Push Notifications** | Coming next release | Reminder times can be set in Settings → Reminders but no notifications fire yet. Web Push + service worker integration pending. |
 | **Data Export & Import** | Coming next release | All data lives in IndexedDB on-device. Until export is implemented, clearing browser storage or uninstalling the app will erase all data permanently. **Back up your device regularly in the meantime.** |
-| **Native App (iOS / Android)** | Coming next release | Capacitor is configured. Packaging to `.ipa` / `.apk` and App Store submission pending. |
+| **Native App (Android)** | Android done ✓ | APK builds and installs on device. See [Android Deployment](#android-deployment) below. |
+| **Native App (iOS)** | Coming next release | Capacitor is configured. Packaging to `.ipa` and App Store submission pending. |
 | **Hobbies in Insights** | Coming next release | Hobby logs are tracked per day but not yet visualised in the Insights charts. |
 
 ---
@@ -90,6 +91,73 @@ Or serve with any static host — the app is entirely client-side.
 
 ---
 
+## Android Deployment
+
+### Prerequisites
+
+- Android Studio (latest) with the `android/` project open
+- Node 20+ and the project dependencies installed (`npm install`)
+- A physical Android device or emulator (API 23+)
+
+### 1 — Build the web assets
+
+Every time you change the React source, rebuild before packaging:
+
+```bash
+npm run build
+npx cap sync android
+```
+
+`cap sync` copies the `dist/` output into the Android project and updates any Capacitor plugins.
+
+### 2 — Test on your device (debug build)
+
+1. Connect your phone via USB and enable **Developer Options → USB Debugging**
+2. In Android Studio click **Run ▶** (or press `Shift+F10`)
+3. Select your device and wait ~30 s for the install
+
+The debug APK is also available at:
+```
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+You can share this file directly (WhatsApp, email, Google Drive). Recipients need to enable **Settings → Install unknown apps** on their phone.
+
+### 3 — Share with friends via Play Console Internal Testing (recommended)
+
+This gives friends a proper Play Store install link with no "unknown source" warnings.
+
+1. **Create a Google Play Developer account** at [play.google.com/console](https://play.google.com/console) — one-time $25 USD fee.
+2. **Generate a signed release build:**
+   - In Android Studio: **Build → Generate Signed Bundle / APK**
+   - Choose **Android App Bundle (.aab)** — Play Store requires this format
+   - Create a keystore on first run (**keep the `.jks` file and passwords safe — losing it means you can never push updates**)
+   - Build type: **release**
+3. The `.aab` file is saved at:
+   ```
+   android/app/release/app-release.aab
+   ```
+4. **In Play Console:**
+   - Create a new app → fill in the title and default language
+   - Go to **Testing → Internal testing → Create new release**
+   - Upload the `.aab` file
+   - Under **Testers**, add your friends' Gmail addresses
+   - Publish the release — it goes live in minutes (no review for internal track)
+5. Share the opt-in link with friends — they install directly from the Play Store
+
+### 4 — Publish publicly on the Play Store
+
+1. Complete the store listing (description, screenshots — at least 2, feature graphic)
+2. Fill in the content rating questionnaire
+3. Add a privacy policy URL (required — can be a simple one-page site)
+4. Move the release from Internal Testing to **Production**
+5. Submit for review — initial review takes 1–3 days; updates are usually same-day
+
+### Known build fix
+
+If you see `Duplicate class kotlin.collections.jdk8` errors, the root `android/build.gradle` already contains the fix — it substitutes `kotlin-stdlib-jdk7/jdk8` with `kotlin-stdlib:1.8.22` to resolve the Kotlin 1.8+ class merge conflict.
+
+---
+
 ## Data & privacy
 
 - **All data is on your device.** Nothing is ever sent to a server.
@@ -102,7 +170,8 @@ Or serve with any static host — the app is entirely client-side.
 
 - [ ] Push notification reminders
 - [ ] JSON export & import (full backup/restore)
-- [ ] Capacitor iOS + Android packaging
+- [x] Android APK — builds and deploys to device
+- [ ] Capacitor iOS packaging
 - [ ] Hobbies in Insights charts
 - [ ] iCloud / Google Drive sync (optional)
 - [ ] Lock screen widget (native only)
