@@ -4,7 +4,9 @@ import { useSettingsStore } from './store/useSettingsStore'
 import { useAppStore } from './store/useAppStore'
 import { Onboarding } from './components/Onboarding/Onboarding'
 import { LifeGrid } from './components/LifeGrid/LifeGrid'
+import { DayView } from './components/DayView/DayView'
 import { AIChatPlaceholder } from './components/AIChat/AIChatPlaceholder'
+import { todayStr } from './utils/dateUtils'
 
 const NAV = [
   { id: 'grid',     label: 'Grid',     icon: GridIcon },
@@ -16,7 +18,14 @@ const NAV = [
 
 export default function App() {
   const { profile, loaded, load } = useSettingsStore()
-  const [activeTab, setActiveTab] = useState('grid')
+  const [activeTab, setActiveTab]     = useState('grid')
+  const [dayViewDate, setDayViewDate] = useState(null)  // null = closed
+
+  // LifeGrid dot clicks open DayView
+  const openDayView = useAppStore(s => s.openDayView)
+  const selectedDate = useAppStore(s => s.selectedDate)
+  const activePanel  = useAppStore(s => s.activePanel)
+  const closePanel   = useAppStore(s => s.closePanel)
 
   useEffect(() => { load() }, [load])
 
@@ -45,12 +54,17 @@ export default function App() {
               </div>
             </TabPanel>
           )}
+          {activeTab === 'today' && (
+            <TabPanel key="today">
+              <DayView initialDate={todayStr()} />
+            </TabPanel>
+          )}
           {activeTab === 'ai' && (
             <TabPanel key="ai">
               <AIChatPlaceholder name={profile.name} />
             </TabPanel>
           )}
-          {activeTab !== 'grid' && activeTab !== 'ai' && (
+          {activeTab !== 'grid' && activeTab !== 'today' && activeTab !== 'ai' && (
             <TabPanel key={activeTab}>
               <ComingSoon tab={activeTab} />
             </TabPanel>
@@ -59,6 +73,13 @@ export default function App() {
       </main>
 
       <BottomNav active={activeTab} onChange={setActiveTab} />
+
+      {/* DayView overlay — opened from grid dot tap */}
+      <AnimatePresence>
+        {activePanel === 'dayView' && selectedDate && (
+          <DayView key={selectedDate} initialDate={selectedDate} asOverlay />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
