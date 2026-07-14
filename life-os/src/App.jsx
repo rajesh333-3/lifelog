@@ -11,6 +11,7 @@ import { Settings } from './components/Settings/Settings'
 import { CalendarTrigger, CalendarPicker } from './components/Calendar/CalendarPicker'
 import { WelcomeTour } from './components/Tour/WelcomeTour'
 import { todayStr } from './utils/dateUtils'
+import { seedCommitmentTasks } from './db'
 
 const LOADING_QUOTES = [
   'Capture today.\nUnderstand yesterday.\nShape tomorrow.',
@@ -40,6 +41,14 @@ export default function App() {
   const closePanel   = useAppStore(s => s.closePanel)
 
   useEffect(() => { load() }, [load])
+
+  // Seed commitment tasks for existing users who completed onboarding before this feature
+  const pillars = useSettingsStore(s => s.pillars)
+  useEffect(() => {
+    if (loaded && profile && pillars) {
+      seedCommitmentTasks(pillars)
+    }
+  }, [loaded, profile, pillars])
 
   // Show tour once after onboarding completes
   useEffect(() => {

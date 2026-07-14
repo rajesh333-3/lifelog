@@ -77,9 +77,67 @@ export async function tasksForDate(date) {
   })
 }
 
-// Returns all open tasks (for Eisenhower board)
+// Returns all open non-commitment tasks (for Eisenhower board)
 export async function openTasks() {
-  return db.todos.where('type').equals('task').filter(t => !t.done).toArray()
+  return db.todos.where('type').equals('task')
+    .filter(t => !t.done && t.source !== 'commitment').toArray()
+}
+
+let _seeding = false
+
+// Seeds commitment tasks from pillars. Idempotent — skips titles that already exist.
+// Lock prevents concurrent calls (e.g. App.jsx effect + Onboarding.finish racing).
+export async function seedCommitmentTasks(pillars) {
+  if (_seeding || !pillars) return
+  _seeding = true
+  try {
+    // First clean up any duplicates created by a prior race
+    await deduplicateCommitments()
+
+    const today = new Date().toISOString().split('T')[0]
+    const existing = await db.todos.where('type').equals('task')
+      .filter(t => t.source === 'commitment').toArray()
+    const existingTitles = new Set(existing.map(t => t.title.trim()))
+
+    for (const [pillar, goals] of Object.entries(pillars)) {
+      for (const goal of (goals ?? [])) {
+        if (!goal?.trim() || existingTitles.has(goal.trim())) continue
+        const all = await db.todos.where('type').equals('task').toArray()
+        const num = String(all.length + 1).padStart(3, '0')
+        await db.todos.add({
+          type:        'task',
+          title:       goal.trim(),
+          quadrant:    'Q2',
+          urgent:      false,
+          important:   true,
+          createdDate: today,
+          dueDate:     null,
+          done:        false,
+          tid:         `T-${num}`,
+          source:      'commitment',
+          pillar,
+        })
+        existingTitles.add(goal.trim())
+      }
+    }
+  } finally {
+    _seeding = false
+  }
+}
+
+// Removes duplicate commitment tasks (same title), keeping the oldest entry.
+async function deduplicateCommitments() {
+  const all = await db.todos.where('type').equals('task')
+    .filter(t => t.source === 'commitment').toArray()
+  const seen = new Map()
+  for (const t of all) {
+    const key = t.title.trim()
+    if (seen.has(key)) {
+      await db.todos.delete(t.id)
+    } else {
+      seen.set(key, t.id)
+    }
+  }
 }
 
 // ── Habit helpers ──────────────────────────────────────────────────────────

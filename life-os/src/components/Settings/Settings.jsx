@@ -192,23 +192,58 @@ function ProfileSection() {
 
 /* ══════════ AI Section ══════════ */
 function AISection() {
-  const { llm, saveLLM } = useSettingsStore()
+  const { llm, saveLLM, loaded } = useSettingsStore()
   const { testConnection } = useLLM()
-  const [provider,    setProvider]    = useState(llm.provider ?? 'ollama')
+  const [provider,    setProvider]    = useState(llm.provider ?? 'gemini')
   const [ollamaUrl,   setOllamaUrl]   = useState(llm.ollamaUrl ?? 'http://localhost:11434')
   const [ollamaModel, setOllamaModel] = useState(llm.ollamaModel ?? 'qwen2.5:7b')
   const [apiKey,      setApiKey]      = useState(llm.apiKey ?? '')
-  const [testState,   setTestState]   = useState('idle')  // idle | testing | ok | fail
+  const [showKey,     setShowKey]     = useState(false)
+  const [testState,   setTestState]   = useState('idle')
+  const [synced,      setSynced]      = useState(false)
+
+  // Sync local form state once after the store finishes loading from DB
+  useEffect(() => {
+    if (loaded && !synced) {
+      setProvider(llm.provider ?? 'gemini')
+      setOllamaUrl(llm.ollamaUrl ?? 'http://localhost:11434')
+      setOllamaModel(llm.ollamaModel ?? 'qwen2.5:7b')
+      setApiKey(llm.apiKey ?? '')
+      setSynced(true)
+    }
+  }, [loaded, synced, llm])
 
   async function save() {
     await saveLLM({ provider, ollamaUrl, ollamaModel, apiKey })
   }
 
   async function test() {
+    await save()
     setTestState('testing')
     try {
-      const reply = await testConnection()
-      setTestState(reply?.toLowerCase().includes('ok') ? 'ok' : 'ok')
+      let ok = false
+      if (provider === 'gemini') {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: 'Reply with the word ok' }] }],
+            }),
+          }
+        )
+        ok = res.ok
+      } else {
+        const url = (ollamaUrl ?? 'http://localhost:11434').replace(/\/$/, '')
+        const res = await fetch(`${url}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: ollamaModel ?? 'qwen2.5:7b', stream: false, messages: [{ role: 'user', content: 'Reply with: ok' }] }),
+        })
+        ok = res.ok
+      }
+      setTestState(ok ? 'ok' : 'fail')
     } catch {
       setTestState('fail')
     }
@@ -220,7 +255,7 @@ function AISection() {
       {/* Provider toggle */}
       <Card>
         <div className="flex gap-0 p-2">
-          {['ollama', 'gemini'].map(p => (
+          {['gemini', 'ollama'].map(p => (
             <button key={p} onClick={() => setProvider(p)}
               className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
               style={{
@@ -228,43 +263,56 @@ function AISection() {
                 color:      provider === p ? '#0a0a0a' : '#555',
               }}
             >
-              {p === 'ollama' ? 'Ollama (local)' : 'Gemini (cloud)'}
+              {p === 'gemini' ? 'Gemini (cloud)' : 'Ollama (desktop)'}
             </button>
           ))}
         </div>
       </Card>
 
-      {/* Ollama config */}
-      {provider === 'ollama' && (
-        <Card>
-          <CardRow label="Server URL">
-            <Field value={ollamaUrl} onChange={setOllamaUrl} placeholder="http://localhost:11434" />
-          </CardRow>
-          <CardRow label="Model">
-            <Field value={ollamaModel} onChange={setOllamaModel} placeholder="qwen2.5:7b" />
-          </CardRow>
-        </Card>
-      )}
-
       {/* Gemini config */}
       {provider === 'gemini' && (
         <Card>
           <CardRow label="API Key">
-            <input
-              type="password"
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              placeholder="AIza…"
-              className="rounded-xl px-3 py-2.5 text-sm text-[#e0e0e0] text-right placeholder:text-[#383838] focus:outline-none w-full transition-colors"
-      style={{ background: '#1c1c1c', border: '1px solid #2e2e2e' }}
-      onFocus={e => e.target.style.borderColor = 'rgba(167,139,250,0.5)'}
-      onBlur={e => e.target.style.borderColor = '#2e2e2e'}
-            />
+            <div className="flex items-center gap-2 flex-1">
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder="AIza…"
+                className="rounded-xl px-3 py-2.5 text-sm text-[#e0e0e0] text-right placeholder:text-[#383838] focus:outline-none flex-1 transition-colors"
+                style={{ background: '#1c1c1c', border: '1px solid #2e2e2e' }}
+                onFocus={e => e.target.style.borderColor = 'rgba(167,139,250,0.5)'}
+                onBlur={e => e.target.style.borderColor = '#2e2e2e'}
+              />
+              <button onClick={() => setShowKey(s => !s)}
+                className="text-[#444] text-xs px-2 py-1 rounded shrink-0">
+                {showKey ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </CardRow>
         </Card>
       )}
 
-      {/* Test connection */}
+      {/* Ollama config */}
+      {provider === 'ollama' && (
+        <>
+          <div className="bg-[#1a1010] border border-[#3a2020] rounded-xl px-3 py-2.5">
+            <p className="text-[#a06060] text-xs leading-relaxed">
+              Ollama runs a local AI server on your computer — it does not work on a phone. Use Gemini for mobile.
+            </p>
+          </div>
+          <Card>
+            <CardRow label="Server URL">
+              <Field value={ollamaUrl} onChange={setOllamaUrl} placeholder="http://localhost:11434" />
+            </CardRow>
+            <CardRow label="Model">
+              <Field value={ollamaModel} onChange={setOllamaModel} placeholder="qwen2.5:7b" />
+            </CardRow>
+          </Card>
+        </>
+      )}
+
+      {/* Test connection — saves first then tests */}
       <button onClick={test} disabled={testState === 'testing'}
         className="w-full py-3 rounded-2xl text-sm font-medium border transition-all active:opacity-70"
         style={{
@@ -274,17 +322,16 @@ function AISection() {
       >
         {testState === 'testing' ? 'Testing…'
           : testState === 'ok'   ? '✓ Connected'
-          : testState === 'fail' ? '✗ Failed — check settings'
-          : 'Test connection'}
+          : testState === 'fail' ? '✗ Failed — check key'
+          : 'Save & test connection'}
       </button>
 
       <SaveBtn onSave={save} />
 
-      {provider === 'ollama' && (
+      {provider === 'gemini' && (
         <p className="text-[#333] text-xs leading-relaxed px-1">
-          Ollama must be running locally. Default model: qwen2.5:7b.
-          Install via <span className="text-[#555]">ollama.ai</span>, then run{' '}
-          <span className="font-mono text-[#444]">ollama pull qwen2.5:7b</span>.
+          Get a free API key at <span className="text-[#555]">aistudio.google.com</span> → Get API Key.
+          The free tier is enough for daily check-ins.
         </p>
       )}
     </Section>

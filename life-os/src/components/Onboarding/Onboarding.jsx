@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSettingsStore } from '../../store/useSettingsStore'
 import { totalWeeks, weeksLived } from '../../utils/dateUtils'
+import { seedCommitmentTasks } from '../../db'
 
 const STEPS = ['welcome', 'name', 'dob', 'expectancy', 'pillars', 'done']
 
@@ -26,6 +27,7 @@ export function Onboarding({ onComplete }) {
   async function finish() {
     await saveProfile({ name: name.trim(), dob, lifeExpectancy: life, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })
     await savePillars(pillars)
+    await seedCommitmentTasks(pillars)
     onComplete()
   }
 
@@ -51,7 +53,7 @@ export function Onboarding({ onComplete }) {
   }
 
   return (
-    <div className="min-h-dvh bg-[#0a0a0a] flex flex-col items-center justify-center px-6">
+    <div className="min-h-dvh bg-[#0a0a0a] flex flex-col items-center justify-center px-6 overflow-y-auto py-10">
       <AnimatePresence mode="wait">
         <motion.div
           key={current}
@@ -88,6 +90,7 @@ export function Onboarding({ onComplete }) {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && canNext.name && setStep(s => s + 1)}
+                onFocus={e => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 320)}
                 placeholder="Your first name"
                 autoFocus
                 className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-4 py-4 text-[#f0f0f0] text-lg placeholder:text-[#444] focus:outline-none focus:border-[#a78bfa] mt-6"
@@ -163,6 +166,7 @@ export function Onboarding({ onComplete }) {
                         <input
                           value={g}
                           onChange={e => updateGoal(key, i, e.target.value)}
+                          onFocus={e => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 320)}
                           className="flex-1 bg-[#222] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-[#f0f0f0] focus:outline-none focus:border-[#a78bfa]"
                         />
                         <button

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../../db'
+import { db, tasksForDate } from '../../db'
 import { useAppStore } from '../../store/useAppStore'
 import { useSettingsStore } from '../../store/useSettingsStore'
 import {
@@ -9,12 +9,16 @@ import {
   weekDates, dateToWeekIndex, toDateStr,
 } from '../../utils/dateUtils'
 import { overallScore, scoreToColor } from '../../utils/scoreUtils'
-import { PillarSlider } from './PillarSlider'
 import { PillarReadOnly } from './PillarReadOnly'
 import { TaskSection } from './TaskSection'
 import { HobbySection } from './HobbySection'
 import { HabitsSection } from './HabitsSection'
 import { useVoiceInput } from '../Voice/useVoiceInput'
+
+const PILLARS = ['physical', 'mental', 'work']
+function pillarOf(task) {
+  return PILLARS.includes(task.pillar) ? task.pillar : 'work'
+}
 
 const SLIDE = {
   initial:    { x: '100%', opacity: 0 },
@@ -30,16 +34,53 @@ export function DayView({ initialDate, asOverlay = false }) {
 
   const [date, setDate]     = useState(initialDate ?? todayStr())
   const [saveState, setSaveState] = useState('idle') // 'idle' | 'saving' | 'saved'
+  const [pastUnlocked, setPastUnlocked] = useState(false)
   const saveTimer = useRef(null)
   const saveStateTimer = useRef(null)
 
   const isPast   = !isToday(date) && !isFuture(date)
   const isFut    = isFuture(date)
-  const isTod    = isToday(date)
+  const isTod    = isToday(date) || (isPast && pastUnlocked)
 
   const dayData = useLiveQuery(() => db.days.get(date), [date])
 
   const [local, setLocal] = useState(emptyDay())
+
+  useEffect(() => { setPastUnlocked(false) }, [date])
+
+  // Live task data — used to derive pillar scores automatically
+  const allTasks = useLiveQuery(() => tasksForDate(date), [date]) ?? []
+
+  // Compute per-pillar score from task completion (null = no tasks for that pillar → keep default)
+  const taskScores = useMemo(() => {
+    const score = (p) => {
+      const pt = allTasks.filter(t => pillarOf(t) === p)
+      return pt.length ? Math.round(pt.filter(t => t.done).length / pt.length * 100) : null
+    }
+    return { physical: score('physical'), mental: score('mental'), work: score('work') }
+  }, [allTasks])
+
+  // Ref so the score-sync effect can read latest local without a stale closure
+  const localRef = useRef(local)
+  useEffect(() => { localRef.current = local })
+
+  // Auto-persist task-derived pillar scores whenever task completion changes
+  const lastScoreSig = useRef('')
+  useEffect(() => {
+    if (!isTod) return
+    const sig = `${taskScores.physical}-${taskScores.mental}-${taskScores.work}`
+    if (sig === lastScoreSig.current) return
+    lastScoreSig.current = sig
+    const patch = {}
+    if (taskScores.physical !== null) patch.physical = taskScores.physical
+    if (taskScores.mental   !== null) patch.mental   = taskScores.mental
+    if (taskScores.work     !== null) patch.work     = taskScores.work
+    if (!Object.keys(patch).length)  return
+    const next = { ...localRef.current, ...patch }
+    setLocal(next)
+    persist(next)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskScores.physical, taskScores.mental, taskScores.work, isTod])
 
   useEffect(() => {
     setLocal(dayData ? {
@@ -213,9 +254,13 @@ export function DayView({ initialDate, asOverlay = false }) {
           )}
 
           {/* ── PAST mode ── */}
-          {isPast && (
+          {isPast && !pastUnlocked && (
             <div className="px-4 pt-5 pb-10 flex flex-col gap-5">
-              <PastNotice />
+              <PastNotice onEdit={() => {
+                if (window.confirm('This day is in the past. Do you want to edit it?')) {
+                  setPastUnlocked(true)
+                }
+              }} />
 
               {dayData ? (
                 <Section title="Your Day">
@@ -273,21 +318,8 @@ export function DayView({ initialDate, asOverlay = false }) {
           {/* ── TODAY mode ── */}
           {isTod && (
             <div className="px-4 pt-5 pb-10 flex flex-col gap-5">
-              <Section title="Pillars">
-                <div className="flex flex-col gap-3">
-                  <PillarSlider icon="💪" label="Physical" color="#4ade80"
-                    value={local.physical}     note={local.physicalNote}
-                    onValue={v => update('physical', v)}
-                    onNote={v => update('physicalNote', v)} />
-                  <PillarSlider icon="🧠" label="Mental"   color="#60a5fa"
-                    value={local.mental}       note={local.mentalNote}
-                    onValue={v => update('mental', v)}
-                    onNote={v => update('mentalNote', v)} />
-                  <PillarSlider icon="💼" label="Work"     color="#fbbf24"
-                    value={local.work}         note={local.workNote}
-                    onValue={v => update('work', v)}
-                    onNote={v => update('workNote', v)} />
-                </div>
+              <Section title="Tasks">
+                <TaskSection date={date} />
               </Section>
 
               <Section title="Reflection">
@@ -304,10 +336,6 @@ export function DayView({ initialDate, asOverlay = false }) {
                   value={local.voiceNote}
                   onChange={v => update('voiceNote', v)}
                 />
-              </Section>
-
-              <Section title="Tasks">
-                <TaskSection date={date} />
               </Section>
 
               <Section title="Habits">
@@ -470,9 +498,11 @@ function Section({ title, subtitle, children }) {
 /* ── Editable reflection textarea with inline mic ── */
 function ReflectField({ label, value, onChange, placeholder }) {
   const { listening, interim, toggle } = useVoiceInput()
+  const valueRef = useRef(value)
+  valueRef.current = value
 
   function handleFinal(text) {
-    onChange(value ? `${value} ${text}` : text)
+    onChange(valueRef.current ? `${valueRef.current} ${text}` : text)
   }
 
   return (
@@ -543,11 +573,20 @@ function FutureNotice() {
   )
 }
 
-function PastNotice() {
+function PastNotice({ onEdit }) {
   return (
-    <div className="rounded-2xl px-4 py-4" style={{ background: '#141414', border: '1px solid #242424' }}>
-      <p className="text-[#505050] text-sm font-medium">This chapter is sealed.</p>
-      <p className="text-[#343434] text-xs mt-1">Read only · you can still mark life events.</p>
+    <div className="rounded-2xl px-4 py-4 flex items-center justify-between gap-4" style={{ background: '#141414', border: '1px solid #242424' }}>
+      <div>
+        <p className="text-[#505050] text-sm font-medium">This is a past day.</p>
+        <p className="text-[#343434] text-xs mt-0.5">Read only — tap to edit anyway.</p>
+      </div>
+      {onEdit && (
+        <button onClick={onEdit}
+          className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-xl active:opacity-70 transition-opacity"
+          style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', color: '#555' }}>
+          Edit
+        </button>
+      )}
     </div>
   )
 }
@@ -555,36 +594,24 @@ function PastNotice() {
 /* ── Voice Journal ── */
 function VoiceJournal({ value, onChange }) {
   const { listening, interim, supported, toggle } = useVoiceInput()
+  const valueRef = useRef(value)
+  valueRef.current = value
 
   function handleFinal(text) {
-    onChange(value ? `${value} ${text}` : text)
+    onChange(valueRef.current ? `${valueRef.current} ${text}` : text)
   }
 
   const wordCount = value.trim() ? value.trim().split(/\s+/).length : 0
 
-  if (supported === false) {
-    return (
-      <div className="bg-[#111] border border-[#1e1e1e] rounded-2xl px-4 py-3">
-        <p className="text-[#444] text-xs">
-          Voice input not supported in this browser. Type your note below.
-        </p>
-        <textarea
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder="Free-form notes…"
-          rows={3}
-          className="w-full bg-transparent text-[#e0e0e0] text-sm mt-2 placeholder:text-[#222] resize-none focus:outline-none leading-relaxed"
-        />
-      </div>
-    )
-  }
+  // supported = null (checking), true (available), false (API absent — keyboard mic still works)
+  const showMicBtn = supported !== false
 
   return (
     <div
       className="bg-[#111] rounded-2xl overflow-hidden transition-all"
       style={{ border: `1px solid ${listening ? 'rgba(167,139,250,0.35)' : '#1e1e1e'}` }}
     >
-      {/* Text area */}
+      {/* Text area — always shown so keyboard voice typing always works */}
       <textarea
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -629,7 +656,7 @@ function VoiceJournal({ value, onChange }) {
               Clear
             </button>
           )}
-          <button
+          {showMicBtn && <button
             onClick={() => toggle(handleFinal)}
             className="w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90"
             style={{
@@ -653,7 +680,7 @@ function VoiceJournal({ value, onChange }) {
                 <line x1="7" y1="12" x2="7" y2="13.5" stroke="#a78bfa" strokeWidth="1.3" strokeLinecap="round"/>
               </svg>
             )}
-          </button>
+          </button>}
         </div>
       </div>
     </div>

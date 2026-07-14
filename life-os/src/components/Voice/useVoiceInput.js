@@ -37,8 +37,7 @@ export function useVoiceInput() {
     }
 
     rec.onend   = () => { setListening(false); setInterim('') }
-    rec.onerror = (e) => {
-      // 'no-speech' is benign — just reset
+    rec.onerror = () => {
       setListening(false)
       setInterim('')
     }

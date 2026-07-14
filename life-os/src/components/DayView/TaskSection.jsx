@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { db, nextId, tasksForDate } from '../../db'
 import { isFuture, todayStr } from '../../utils/dateUtils'
 
-// Single combined priority badge — red (most critical) → green (least critical)
 const PRIORITY = {
   Q1: { label: 'Urgent & Important', color: '#f87171', bg: '#f8717115', dot: '🔴' },
   Q2: { label: 'Important',          color: '#fbbf24', bg: '#fbbf2415', dot: '🟡' },
@@ -12,7 +11,6 @@ const PRIORITY = {
   Q4: { label: 'Low priority',       color: '#4ade80', bg: '#4ade8015', dot: '🟢' },
 }
 
-// For the add-form toggles (input axis labels)
 const URGENCY = {
   true:  { label: 'Urgent',     color: '#f87171', bg: '#f8717115' },
   false: { label: 'Not Urgent', color: '#4ade80', bg: '#4ade8015' },
@@ -21,6 +19,13 @@ const IMPORTANCE = {
   true:  { label: 'Important',     color: '#a78bfa', bg: '#a78bfa15' },
   false: { label: 'Not Important', color: '#555',    bg: '#55555515' },
 }
+
+const PILLAR_CONFIG = {
+  physical: { label: 'Physical', icon: '💪', color: '#4ade80', bg: '#4ade8018' },
+  mental:   { label: 'Mental',   icon: '🧠', color: '#60a5fa', bg: '#60a5fa18' },
+  work:     { label: 'Work',     icon: '💼', color: '#a78bfa', bg: '#a78bfa18' },
+}
+const PILLARS = ['physical', 'mental', 'work']
 
 function toQuadrant(urgent, important) {
   if (urgent  && important)  return 'Q1'
@@ -33,11 +38,10 @@ export function TaskSection({ date, futureOnly, readOnly }) {
   const [input,     setInput]     = useState('')
   const [dueDate,   setDueDate]   = useState(date)
   const [urgent,    setUrgent]    = useState(false)
-  const [important, setImportant] = useState(false)
+  const [important, setImportant] = useState(true)
+  const [pillar,    setPillar]    = useState('work')
   const [adding,    setAdding]    = useState(false)
 
-  // Float-forward: show tasks created on/before this date that are still open,
-  // plus anything completed on exactly this date (for history)
   const tasks = useLiveQuery(() => tasksForDate(date), [date]) ?? []
 
   async function addTask() {
@@ -49,6 +53,7 @@ export function TaskSection({ date, futureOnly, readOnly }) {
       quadrant:    toQuadrant(urgent, important),
       urgent,
       important,
+      pillar,
       createdDate: date,
       dueDate:     dueDate || null,
       done:        false,
@@ -56,55 +61,112 @@ export function TaskSection({ date, futureOnly, readOnly }) {
     })
     setInput('')
     setUrgent(false)
-    setImportant(false)
+    setImportant(true)
+    setPillar('work')
     setAdding(false)
   }
 
   async function toggleDone(id, done) {
-    // Mark done: stamp completedDate so it stays visible on the day it was closed
     await db.todos.update(id, {
       done:          !done,
       completedDate: !done ? todayStr() : null,
     })
   }
 
+  async function updateTask(id, patch) {
+    await db.todos.update(id, patch)
+  }
+
   async function deleteTask(id) {
     await db.todos.delete(id)
   }
 
-  const open = tasks.filter(t => !t.done)
-  const done = tasks.filter(t => t.done)
+  // Group all tasks by pillar; tasks without a pillar go to work
+  const byPillar = {}
+  for (const p of PILLARS) byPillar[p] = []
+  for (const t of tasks) {
+    const p = PILLARS.includes(t.pillar) ? t.pillar : 'work'
+    byPillar[p].push(t)
+  }
+
+  const anyTasks = tasks.length > 0
 
   return (
-    <div className="flex flex-col gap-2">
-      {/* Open tasks */}
-      <AnimatePresence initial={false}>
-        {open.map(task => (
-          <TaskRow key={task.id} task={task}
-            onToggle={readOnly ? null : toggleDone}
-            onDelete={readOnly ? null : deleteTask} />
-        ))}
-      </AnimatePresence>
+    <div className="flex flex-col gap-3">
+      {/* Per-pillar sections */}
+      {PILLARS.map(p => {
+        const cfg       = PILLAR_CONFIG[p]
+        const all       = byPillar[p]
+        const doneCount = all.filter(t => t.done).length
+        const total     = all.length
+        if (total === 0 && readOnly) return null
+        if (total === 0) return null
+        const pct       = total === 0 ? 0 : Math.round((doneCount / total) * 100)
+        const complete  = total > 0 && doneCount === total
+        const open      = all.filter(t => !t.done)
+        const done      = all.filter(t => t.done)
 
-      {/* Completed tasks */}
-      {done.length > 0 && (
-        <details className="group">
-          <summary className="text-[10px] text-[#555] uppercase tracking-widest cursor-pointer select-none list-none flex items-center gap-1.5 py-1 min-h-[36px]">
-            <span className="group-open:rotate-90 transition-transform inline-block text-[8px]">▶</span>
-            {done.length} completed
-          </summary>
-          <div className="mt-1 flex flex-col gap-1.5">
-            {done.map(task => (
-              <TaskRow key={task.id} task={task}
-                onToggle={readOnly ? null : toggleDone}
-                onDelete={readOnly ? null : deleteTask}
-                faded />
-            ))}
+        return (
+          <div key={p} className="flex flex-col gap-1.5">
+            {/* Pillar header + progress bar */}
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="text-[10px] uppercase tracking-widest flex items-center gap-1.5"
+                style={{ color: cfg.color }}>
+                <span>{cfg.icon}</span>
+                {cfg.label}
+              </span>
+              <span className="text-[10px] font-semibold tabular-nums"
+                style={{ color: complete ? '#4ade80' : cfg.color }}>
+                {doneCount}/{total}
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="h-1 rounded-full overflow-hidden" style={{ background: '#1e1e1e' }}>
+              <motion.div
+                className="h-full rounded-full"
+                style={{ background: complete ? '#4ade80' : cfg.color }}
+                initial={false}
+                animate={{ width: `${pct}%` }}
+                transition={{ type: 'spring', stiffness: 200, damping: 28 }}
+              />
+            </div>
+
+            {/* Open tasks */}
+            <AnimatePresence initial={false}>
+              {open.map(task => (
+                <TaskRow key={task.id} task={task}
+                  onToggle={readOnly ? null : toggleDone}
+                  onUpdate={task.source === 'commitment' ? null : (readOnly ? null : updateTask)}
+                  onDelete={task.source === 'commitment' ? null : (readOnly ? null : deleteTask)} />
+              ))}
+            </AnimatePresence>
+
+            {/* Completed tasks (collapsible) */}
+            {done.length > 0 && (
+              <details className="group">
+                <summary className="text-[10px] text-[#555] uppercase tracking-widest cursor-pointer select-none list-none flex items-center gap-1.5 py-1 min-h-[32px]">
+                  <span className="group-open:rotate-90 transition-transform inline-block text-[8px]">▶</span>
+                  {done.length} done
+                </summary>
+                <div className="mt-1 flex flex-col gap-1.5">
+                  <AnimatePresence initial={false}>
+                    {done.map(task => (
+                      <TaskRow key={task.id} task={task}
+                        onToggle={readOnly ? null : toggleDone}
+                        onUpdate={task.source === 'commitment' ? null : (readOnly ? null : updateTask)}
+                        onDelete={task.source === 'commitment' ? null : (readOnly ? null : deleteTask)}
+                        faded />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </details>
+            )}
           </div>
-        </details>
-      )}
+        )
+      })}
 
-      {tasks.length === 0 && readOnly && (
+      {!anyTasks && readOnly && (
         <p className="text-[#555] text-sm py-1">No tasks logged.</p>
       )}
 
@@ -129,6 +191,26 @@ export function TaskSection({ date, futureOnly, readOnly }) {
                   placeholder="What needs to be done?"
                   className="bg-transparent text-[#f0f0f0] text-sm placeholder:text-[#333] focus:outline-none w-full"
                 />
+
+                {/* Pillar picker */}
+                <div className="flex gap-1.5">
+                  {PILLARS.map(p => {
+                    const cfg = PILLAR_CONFIG[p]
+                    const active = pillar === p
+                    return (
+                      <button key={p} type="button" onClick={() => setPillar(p)}
+                        className="flex-1 text-[11px] font-medium rounded-full py-1.5 transition-all active:scale-95 min-h-[32px] flex items-center justify-center gap-1"
+                        style={{
+                          color:      active ? cfg.color : '#444',
+                          background: active ? cfg.bg    : 'transparent',
+                          border:     `1px solid ${active ? cfg.color + '55' : '#2a2a2a'}`,
+                        }}>
+                        <span>{cfg.icon}</span>
+                        <span>{cfg.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
 
                 {/* Urgency × Importance toggles */}
                 <div className="flex gap-2">
@@ -198,13 +280,70 @@ export function TaskSection({ date, futureOnly, readOnly }) {
 }
 
 /* ── Task row ── */
-function TaskRow({ task, onToggle, onDelete, faded }) {
-  const quadrant = task.quadrant ?? toQuadrant(
-    task.urgent    ?? false,
-    task.important ?? false,
-  )
+function TaskRow({ task, onToggle, onUpdate, onDelete, faded }) {
+  const [editing,   setEditing]   = useState(false)
+  const [editTitle, setEditTitle] = useState(task.title)
+  const [editUrg,   setEditUrg]   = useState(task.urgent    ?? false)
+  const [editImp,   setEditImp]   = useState(task.important ?? false)
+
+  const quadrant = task.quadrant ?? toQuadrant(task.urgent ?? false, task.important ?? false)
   const priority = PRIORITY[quadrant] ?? PRIORITY.Q4
-  const checkColor = task.done ? '#4ade80' : priority.color
+
+  function startEdit() {
+    setEditTitle(task.title)
+    setEditUrg(task.urgent ?? false)
+    setEditImp(task.important ?? false)
+    setEditing(true)
+  }
+
+  async function saveEdit() {
+    if (!editTitle.trim()) { setEditing(false); return }
+    const newQ = toQuadrant(editUrg, editImp)
+    await onUpdate(task.id, {
+      title:     editTitle.trim(),
+      urgent:    editUrg,
+      important: editImp,
+      quadrant:  newQ,
+    })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="bg-[#111] border border-[#a78bfa44] rounded-xl px-3 py-3 flex flex-col gap-2.5"
+      >
+        <input
+          autoFocus
+          value={editTitle}
+          onChange={e => setEditTitle(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
+          className="bg-transparent text-[#f0f0f0] text-sm focus:outline-none w-full"
+        />
+        <div className="flex gap-2">
+          <TagToggle active={editUrg} onColor={URGENCY.true.color} onBg={URGENCY.true.bg}
+            offColor={URGENCY.false.color} offBg={URGENCY.false.bg}
+            onLabel="Urgent" offLabel="Not Urgent" onToggle={() => setEditUrg(u => !u)} />
+          <TagToggle active={editImp} onColor={IMPORTANCE.true.color} onBg={IMPORTANCE.true.bg}
+            offColor={IMPORTANCE.false.color} offBg={IMPORTANCE.false.bg}
+            onLabel="Important" offLabel="Not Important" onToggle={() => setEditImp(i => !i)} />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={saveEdit}
+            className="flex-1 bg-[#a78bfa] text-[#0a0a0a] text-xs font-semibold rounded-lg py-2 min-h-[36px]">
+            Save
+          </button>
+          <button onClick={() => setEditing(false)}
+            className="px-4 border border-[#2a2a2a] rounded-lg text-[#555] text-xs min-h-[36px]">
+            Cancel
+          </button>
+        </div>
+      </motion.div>
+    )
+  }
 
   return (
     <motion.div
@@ -242,16 +381,31 @@ function TaskRow({ task, onToggle, onDelete, faded }) {
 
       {/* Title */}
       <span className={`flex-1 text-sm leading-snug ${task.done ? 'line-through text-[#333]' : 'text-[#e0e0e0]'}`}>
+        {task.source === 'commitment' && (
+          <span className="text-[10px] text-[#444] mr-1.5 font-medium uppercase tracking-wider">commitment</span>
+        )}
         {task.title}
       </span>
 
-      {/* Single combined priority badge */}
+      {/* Priority badge */}
       <span
         className="text-[10px] font-semibold px-2.5 py-1 rounded-full shrink-0 whitespace-nowrap"
         style={{ color: priority.color, background: priority.bg, border: `1px solid ${priority.color}33` }}
       >
         {priority.label}
       </span>
+
+      {/* Edit */}
+      {onUpdate && !task.done && (
+        <button
+          onClick={startEdit}
+          className="opacity-0 group-hover:opacity-100 text-[#2a2a2a] hover:text-[#a78bfa] transition-all w-6 h-6 flex items-center justify-center rounded shrink-0"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      )}
 
       {/* Delete */}
       {onDelete && (
@@ -264,7 +418,7 @@ function TaskRow({ task, onToggle, onDelete, faded }) {
   )
 }
 
-/* ── Toggle pill for urgency / importance ── */
+/* ── Toggle pill ── */
 function TagToggle({ active, onColor, onBg, offColor, offBg, onLabel, offLabel, onToggle }) {
   return (
     <button

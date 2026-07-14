@@ -202,20 +202,50 @@ function QuadrantColumn({ quadrant, tasks }) {
 
 /* ── Task row on board ── */
 function BoardTaskRow({ task, accentColor, isOverlay }) {
+  const [editing,   setEditing]   = useState(false)
+  const [editTitle, setEditTitle] = useState(task.title)
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
-    disabled: isOverlay,
+    disabled: isOverlay || editing,
   })
 
   async function markDone() {
-    await db.todos.update(task.id, {
-      done:          true,
-      completedDate: todayStr(),
-    })
+    await db.todos.update(task.id, { done: true, completedDate: todayStr() })
   }
 
   async function del() {
     await db.todos.delete(task.id)
+  }
+
+  async function saveEdit() {
+    if (editTitle.trim()) await db.todos.update(task.id, { title: editTitle.trim() })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <motion.div
+        layout
+        className="bg-[#0e0e0e] rounded-xl px-2.5 py-2 flex flex-col gap-2"
+        style={{ border: `1px solid ${accentColor}44` }}
+      >
+        <input
+          autoFocus
+          value={editTitle}
+          onChange={e => setEditTitle(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditing(false) }}
+          className="bg-transparent text-[#f0f0f0] text-xs focus:outline-none w-full"
+        />
+        <div className="flex gap-1.5">
+          <button onClick={saveEdit}
+            className="flex-1 text-[10px] font-semibold rounded-lg py-1.5 min-h-[32px]"
+            style={{ background: accentColor + '22', color: accentColor }}>Save</button>
+          <button onClick={() => setEditing(false)}
+            className="px-3 text-[10px] rounded-lg border border-[#2a2a2a] text-[#555] min-h-[32px]">Cancel</button>
+        </div>
+      </motion.div>
+    )
   }
 
   return (
@@ -230,41 +260,40 @@ function BoardTaskRow({ task, accentColor, isOverlay }) {
       transition={{ duration: 0.15 }}
       className="bg-[#0e0e0e] rounded-xl px-2.5 py-2.5 group flex items-start gap-2"
       style={{
-        border:   `1px solid ${accentColor}18`,
-        cursor:   isOverlay ? 'grabbing' : 'grab',
-        transform: CSS.Translate.toString(transform),
-        boxShadow: isOverlay ? '0 8px 24px rgba(0,0,0,0.5)' : undefined,
-        opacity:   isOverlay ? 1 : undefined,
+        border:      `1px solid ${accentColor}18`,
+        cursor:      isOverlay ? 'grabbing' : 'grab',
+        transform:   CSS.Translate.toString(transform),
+        boxShadow:   isOverlay ? '0 8px 24px rgba(0,0,0,0.5)' : undefined,
         touchAction: 'none',
       }}
     >
-      {/* Check — disabled during drag overlay */}
-      {!isOverlay && (
-        <button
-          onClick={markDone}
-          onPointerDown={e => e.stopPropagation()}
+      {/* Check */}
+      {!isOverlay ? (
+        <button onClick={markDone} onPointerDown={e => e.stopPropagation()}
           className="w-4 h-4 rounded-full border mt-0.5 shrink-0 flex items-center justify-center active:scale-90 transition-transform"
-          style={{ borderColor: accentColor + '55' }}
-        />
-      )}
-      {isOverlay && (
+          style={{ borderColor: accentColor + '55' }} />
+      ) : (
         <div className="w-4 h-4 rounded-full border mt-0.5 shrink-0" style={{ borderColor: accentColor + '55' }} />
       )}
 
       {/* Title */}
       <span className="flex-1 text-[12px] text-[#ccc] leading-snug">{task.title}</span>
 
-      {/* TID badge + delete */}
+      {/* TID + edit + delete */}
       <div className="flex flex-col items-end gap-1 shrink-0">
-        <span className="text-[9px] font-mono" style={{ color: accentColor + '66' }}>
-          {task.tid}
-        </span>
+        <span className="text-[9px] font-mono" style={{ color: accentColor + '66' }}>{task.tid}</span>
         {!isOverlay && (
-          <button
-            onClick={del}
-            onPointerDown={e => e.stopPropagation()}
-            className="opacity-0 group-hover:opacity-100 text-[#333] hover:text-[#f87171] transition-all text-xs leading-none"
-          >×</button>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={e => { e.stopPropagation(); setEditTitle(task.title); setEditing(true) }}
+              onPointerDown={e => e.stopPropagation()}
+              className="text-[#444] hover:text-[#a78bfa] transition-colors">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <path d="M8.5 1.5l2 2L4 10H2v-2L8.5 1.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button onClick={del} onPointerDown={e => e.stopPropagation()}
+              className="text-[#333] hover:text-[#f87171] transition-colors text-xs leading-none">×</button>
+          </div>
         )}
       </div>
     </motion.div>
@@ -276,7 +305,7 @@ function AddTaskButton() {
   const [open,      setOpen]      = useState(false)
   const [input,     setInput]     = useState('')
   const [urgent,    setUrgent]    = useState(false)
-  const [important, setImportant] = useState(false)
+  const [important, setImportant] = useState(true)
 
   async function add() {
     if (!input.trim()) return
@@ -293,7 +322,7 @@ function AddTaskButton() {
     })
     setInput('')
     setUrgent(false)
-    setImportant(false)
+    setImportant(true)
     setOpen(false)
   }
 
