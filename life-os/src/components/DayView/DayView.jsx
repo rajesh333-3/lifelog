@@ -262,22 +262,9 @@ export function DayView({ initialDate, asOverlay = false }) {
                 }
               }} />
 
-              {dayData ? (
-                <Section title="Your Day">
-                  <div className="flex flex-col gap-2.5">
-                    <PillarReadOnly icon="💪" label="Physical" color="#4ade80"
-                      value={local.physical} note={local.physicalNote} />
-                    <PillarReadOnly icon="🧠" label="Mental"   color="#60a5fa"
-                      value={local.mental}   note={local.mentalNote}   />
-                    <PillarReadOnly icon="💼" label="Work"     color="#fbbf24"
-                      value={local.work}     note={local.workNote}     />
-                  </div>
-                </Section>
-              ) : (
-                <Section title="Your Day">
-                  <p className="text-[#444] text-sm">No data logged for this day.</p>
-                </Section>
-              )}
+              <Section title="Tasks">
+                <TaskSection date={date} readOnly />
+              </Section>
 
               {(local.wentWell || local.couldBeBetter) && (
                 <Section title="Reflection">
@@ -297,10 +284,6 @@ export function DayView({ initialDate, asOverlay = false }) {
                   <ReadOnlyCard label="🎙 Voice note" text={local.voiceNote} />
                 </Section>
               )}
-
-              <Section title="Tasks">
-                <TaskSection date={date} readOnly />
-              </Section>
 
               <Section title="Habits">
                 <HabitsSection date={date} readOnly />

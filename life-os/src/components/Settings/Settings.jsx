@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Dexie from 'dexie'
 import { useSettingsStore } from '../../store/useSettingsStore'
 import { useLLM } from '../AIChat/useLLM'
-import { getHabits, saveHabits } from '../../db'
+import { db as lifeDB, getHabits, saveHabits } from '../../db'
 import { NextReleaseBanner } from '../UI/NextReleaseBanner'
 
 const PILLAR_META = [
@@ -42,6 +43,7 @@ export function Settings({ onReplayTour }) {
           { id: 'pillars',   label: 'Pillars'   },
           { id: 'habits',    label: 'Habits'    },
           { id: 'reminders', label: 'Reminders' },
+          { id: 'data',      label: 'Data'      },
         ].map(({ id, label }) => (
           <button key={id} onClick={() => setSection(id)}
             className="shrink-0 py-2 px-3 text-xs font-medium rounded-xl transition-all"
@@ -65,6 +67,7 @@ export function Settings({ onReplayTour }) {
             {section === 'pillars'   && <PillarsSection   key="pillars"   />}
             {section === 'habits'    && <HabitsSettings   key="habits"    />}
             {section === 'reminders' && <RemindersSection key="reminders" />}
+            {section === 'data'      && <DataSection      key="data"      />}
           </AnimatePresence>
         </div>
       </div>
@@ -627,6 +630,177 @@ function HabitsSettings() {
           No habits yet. Add ones you want to track daily — exercise, reading, deep work…
         </p>
       )}
+    </Section>
+  )
+}
+
+/* ══════════ Data Section ══════════ */
+function DataSection() {
+  const [confirmStep,  setConfirmStep]  = useState(0)
+  const [exportState,  setExportState]  = useState('idle')  // idle | exporting | done | error
+  const [importState,  setImportState]  = useState('idle')  // idle | importing | done | error
+  const fileInputRef = useRef(null)
+
+  async function exportData() {
+    setExportState('exporting')
+    try {
+      const payload = {
+        version:    2,
+        exportedAt: new Date().toISOString(),
+        days:       await lifeDB.days.toArray(),
+        todos:      await lifeDB.todos.toArray(),
+        hobbies:    await lifeDB.hobbies.toArray(),
+        settings:   await lifeDB.settings.toArray(),
+        habitLogs:  await lifeDB.habitLogs.toArray(),
+      }
+      const json = JSON.stringify(payload, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
+      const name = `lifelog-backup-${new Date().toISOString().slice(0, 10)}.json`
+      const file = new File([blob], name, { type: 'application/json' })
+
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Life Log Backup' })
+      } else {
+        const url = URL.createObjectURL(blob)
+        const a   = document.createElement('a')
+        a.href     = url
+        a.download = name
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+      setExportState('done')
+      setTimeout(() => setExportState('idle'), 3000)
+    } catch {
+      setExportState('idle')
+    }
+  }
+
+  async function importData(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportState('importing')
+    try {
+      const text    = await file.text()
+      const payload = JSON.parse(text)
+      if (!payload.version || !payload.days) throw new Error('invalid backup')
+
+      await lifeDB.days.clear()
+      await lifeDB.todos.clear()
+      await lifeDB.hobbies.clear()
+      await lifeDB.settings.clear()
+      await lifeDB.habitLogs.clear()
+
+      if (payload.days?.length)      await lifeDB.days.bulkAdd(payload.days)
+      if (payload.todos?.length)     await lifeDB.todos.bulkAdd(payload.todos)
+      if (payload.hobbies?.length)   await lifeDB.hobbies.bulkAdd(payload.hobbies)
+      if (payload.settings?.length)  await lifeDB.settings.bulkAdd(payload.settings)
+      if (payload.habitLogs?.length) await lifeDB.habitLogs.bulkAdd(payload.habitLogs)
+
+      setImportState('done')
+      setTimeout(() => window.location.reload(), 1200)
+    } catch {
+      setImportState('error')
+      setTimeout(() => setImportState('idle'), 3000)
+    }
+  }
+
+  async function wipeEverything() {
+    setConfirmStep(2)
+    try {
+      await Dexie.delete('LifeOS')
+      localStorage.clear()
+    } finally {
+      window.location.reload()
+    }
+  }
+
+  return (
+    <Section>
+      {/* Export */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <div className="px-4 pt-4 pb-2">
+          <p className="text-[#f0f0f0] text-sm font-semibold mb-1">Export backup</p>
+          <p className="text-[#555] text-xs leading-relaxed">
+            Save all your logs, tasks, and habits as a JSON file. Use this before uninstalling.
+          </p>
+        </div>
+        <div className="px-4 pb-4">
+          <button
+            onClick={exportData}
+            disabled={exportState === 'exporting'}
+            className="w-full py-3 rounded-xl text-sm font-semibold transition-all active:opacity-70 disabled:opacity-50"
+            style={{ background: '#a78bfa18', border: '1px solid #a78bfa33', color: '#a78bfa' }}
+          >
+            {exportState === 'exporting' ? 'Exporting…' : exportState === 'done' ? '✓ Exported' : 'Export data'}
+          </button>
+        </div>
+      </div>
+
+      {/* Import */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <div className="px-4 pt-4 pb-2">
+          <p className="text-[#f0f0f0] text-sm font-semibold mb-1">Restore backup</p>
+          <p className="text-[#555] text-xs leading-relaxed">
+            Pick a previously exported JSON file to restore your data. Current data will be replaced.
+          </p>
+        </div>
+        <div className="px-4 pb-4">
+          <input ref={fileInputRef} type="file" accept=".json,application/json"
+            className="hidden" onChange={importData} />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importState === 'importing'}
+            className="w-full py-3 rounded-xl text-sm font-semibold transition-all active:opacity-70 disabled:opacity-50"
+            style={{ background: '#4ade8018', border: '1px solid #4ade8033', color: '#4ade80' }}
+          >
+            {importState === 'importing' ? 'Restoring…'
+              : importState === 'done'   ? '✓ Done — reloading…'
+              : importState === 'error'  ? 'Invalid file'
+              : 'Restore from backup'}
+          </button>
+        </div>
+      </div>
+
+      {/* Danger zone */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
+        <div className="px-4 py-4">
+          <p className="text-[#f87171] text-sm font-semibold mb-1">Danger Zone</p>
+          <p className="text-[#555] text-xs leading-relaxed">
+            Permanently deletes all logs, tasks, habits, and settings. No undo.
+          </p>
+        </div>
+        <div className="px-4 pb-4">
+          {confirmStep === 0 && (
+            <button onClick={() => setConfirmStep(1)}
+              className="w-full py-3 rounded-xl text-sm font-semibold transition-all active:opacity-70"
+              style={{ background: '#f8717115', border: '1px solid #f8717133', color: '#f87171' }}>
+              Reset all data
+            </button>
+          )}
+          {confirmStep === 1 && (
+            <div className="flex flex-col gap-2">
+              <p className="text-[#f87171] text-xs text-center font-medium">
+                Are you absolutely sure? Everything will be gone.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmStep(0)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium active:opacity-70"
+                  style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', color: '#888' }}>
+                  Cancel
+                </button>
+                <button onClick={wipeEverything}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold active:opacity-70"
+                  style={{ background: '#f87171', color: '#0a0a0a' }}>
+                  Yes, wipe it all
+                </button>
+              </div>
+            </div>
+          )}
+          {confirmStep === 2 && (
+            <p className="text-[#555] text-xs text-center py-2">Wiping data…</p>
+          )}
+        </div>
+      </div>
     </Section>
   )
 }
