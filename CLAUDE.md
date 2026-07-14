@@ -209,11 +209,56 @@ Upload `app-release.apk` to Google Drive and share the download link. Friends ta
 
 ---
 
+## Play Store Submission — Step by Step
+
+### Blockers to clear first
+1. **Google Play Developer account** — one-time $25 at play.google.com/console
+2. **Privacy policy URL** — must be a live public URL. A Notion page or GitHub Pages one-pager works. Content: state that all data is stored on-device only, no data collected or shared (except optional Gemini API calls initiated by the user).
+
+### Build an `.aab` (Play Store requires this, not `.apk`)
+```bash
+cd life-os
+npm run build
+npx cap sync android
+```
+Then in Android Studio:
+- **Build → Generate Signed Bundle / APK → Android App Bundle**
+- Keystore: `life-os/android/lifelog-release.jks`, alias `lifelog`, password `lifelog123`
+- Output: `android/app/release/app-release.aab`
+
+### Assets needed for store listing
+
+| Asset | Spec |
+|---|---|
+| App icon | 512×512 PNG, no transparency |
+| Feature graphic | 1024×500 PNG or JPG |
+| Phone screenshots | Min 2, max 8 — portrait PNG/JPG |
+| Short description | Max 80 chars |
+| Full description | Max 4000 chars |
+| Privacy policy URL | Required — must be live |
+
+### Play Console release flow
+```
+Create app → Store listing (fill assets above) →
+Upload .aab → Content rating questionnaire (~10 yes/no, result: Everyone) →
+Data safety form (select "No data collected" — all local, no sharing) →
+Choose release track → Submit
+```
+
+### Release tracks
+- **Internal testing** — instant, no Google review, max 100 testers. Use this to share with friends via a real Play Store link (no "unknown sources" warning).
+- **Production** — goes through Google review (~1–3 days). Use after internal testing validates the build.
+
+### Before each new release build
+- Bump `versionCode` and `versionName` in `life-os/android/app/build.gradle`
+- Run `npm run build && npx cap sync android` before opening Android Studio
+
+---
+
 ## Pending / Ideas for Next Release
 
+- [ ] Play Store submission (blockers: $25 dev account + privacy policy URL)
 - [ ] Push notifications (reminder times saved in Settings → Reminders, activation pending)
-- [ ] Play Store submission (need screenshots, privacy policy, content rating)
-- [ ] Play Console internal testing (proper share without "unknown sources" warning)
 - [ ] versionCode bump before each release build
 - [ ] Streak tracking (habit streaks, task completion streaks)
 - [ ] Weekly review summary screen
