@@ -172,18 +172,18 @@ export default function App() {
 
 /* ── Search hint data ── */
 const SEARCH_HINTS = [
-  { text: 'when did i go meet John…',              color: '#60a5fa' },
-  { text: 'that night we played hockey so late…',  color: '#34d399' },
-  { text: 'felt sad when my puppy fell sick…',     color: '#f87171' },
-  { text: 'the day i first met…',                  color: '#c4b5fd' },
-  { text: 'that road trip we took last summer…',   color: '#fbbf24' },
-  { text: 'week everything started falling apart…',color: '#f97316' },
-  { text: 'morning i decided to change things…',   color: '#a78bfa' },
-  { text: 'birthday dinner with the whole team…',  color: '#4ade80' },
-  { text: 'cried but somehow felt better after…',  color: '#818cf8' },
-  { text: 'finally cracked that hard problem…',    color: '#34d399' },
-  { text: "couldn't sleep, kept overthinking…",    color: '#fb923c' },
-  { text: 'the day everything just clicked…',      color: '#4ade80' },
+  { text: 'the day I hit a century in the district match…', color: '#fbbf24' },
+  { text: 'the morning I got my first job offer…',          color: '#34d399' },
+  { text: 'that night we celebrated my graduation…',        color: '#a78bfa' },
+  { text: 'the day my first paycheck arrived…',             color: '#4ade80' },
+  { text: 'when I moved into my very own place…',           color: '#60a5fa' },
+  { text: 'the day I finally ran a 5K without stopping…',   color: '#f97316' },
+  { text: 'that sunrise trek — we made it to the top…',     color: '#fb923c' },
+  { text: 'when the whole team won the championship…',      color: '#fbbf24' },
+  { text: 'the day I learned to drive on my own…',          color: '#34d399' },
+  { text: 'first time I travelled solo abroad…',            color: '#818cf8' },
+  { text: 'the weekend we built something from scratch…',   color: '#4ade80' },
+  { text: 'the day I first met…',                           color: '#c4b5fd' },
 ]
 
 /* ── Animated search bar ── */
@@ -204,15 +204,20 @@ function AnimatedSearchBar({ onClick }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="flex items-center gap-2.5 w-full active:scale-[0.97]"
-      animate={{
-        boxShadow: hovered
-          ? '0 0 0 1.5px rgba(167,139,250,0.35), 0 0 18px rgba(167,139,250,0.12)'
-          : '0 0 0 1px rgba(255,255,255,0.07)',
-        backgroundColor: hovered
-          ? 'rgba(167,139,250,0.07)'
-          : 'rgba(255,255,255,0.04)',
+      animate={hovered ? {
+        boxShadow:       '0 0 0 1.5px rgba(167,139,250,0.55), 0 0 22px rgba(167,139,250,0.22)',
+        backgroundColor: 'rgba(167,139,250,0.09)',
+      } : {
+        boxShadow: [
+          '0 0 0 1px rgba(167,139,250,0.10)',
+          '0 0 0 1.5px rgba(167,139,250,0.45), 0 0 16px rgba(167,139,250,0.18)',
+          '0 0 0 1px rgba(167,139,250,0.10)',
+        ],
+        backgroundColor: 'rgba(255,255,255,0.04)',
       }}
-      transition={{ duration: 0.18 }}
+      transition={hovered
+        ? { duration: 0.18 }
+        : { duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
       style={{
         borderRadius:            11,
         padding:                 '7px 12px',

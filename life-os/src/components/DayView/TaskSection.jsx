@@ -435,10 +435,17 @@ function TaskRow({ task, isDone, pending = 0, onToggle, onUpdate, onDelete, fade
 
       {/* Delete */}
       {onDelete && (
-        <button
+        <motion.button
           onClick={() => onDelete(task.id)}
-          className="opacity-0 group-hover:opacity-100 text-[#2a2a2a] hover:text-[#f87171] transition-all w-6 h-6 flex items-center justify-center rounded shrink-0 text-lg leading-none"
-        >×</button>
+          className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center rounded-md shrink-0 text-base leading-none"
+          style={{ color: '#555', flexShrink: 0 }}
+          whileHover={{
+            color:           '#f87171',
+            backgroundColor: 'rgba(248,113,113,0.13)',
+            boxShadow:       '0 0 0 1px rgba(248,113,113,0.30), 0 0 10px rgba(248,113,113,0.25)',
+          }}
+          transition={{ duration: 0.14 }}
+        >×</motion.button>
       )}
     </motion.div>
   )
