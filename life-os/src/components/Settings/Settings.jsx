@@ -632,49 +632,77 @@ function HabitsSettings() {
 
 /* ══════════ Data Section ══════════ */
 function DataSection() {
-  const [confirmStep,  setConfirmStep]  = useState(0)
-  const [exportState,  setExportState]  = useState('idle')  // idle | exporting | done | error
-  const [exportSummary, setExportSummary] = useState(null)
-  const [importState,  setImportState]  = useState('idle')  // idle | importing | done | error
+  const [confirmStep,     setConfirmStep]     = useState(0)
+  const [exportState,     setExportState]     = useState('idle')  // idle | exporting | done | error
+  const [exportSummary,   setExportSummary]   = useState(null)
+  const [importState,     setImportState]     = useState('idle')  // idle | importing | done | error
+  const [preWipeState,    setPreWipeState]    = useState('idle')  // idle | exporting | done | error
+  const [preWipeSummary,  setPreWipeSummary]  = useState(null)
+  const [dataCounts,      setDataCounts]      = useState(null)    // { days, tasks, habits }
   const fileInputRef = useRef(null)
+
+  // Count records whenever the save-before-wipe step opens
+  useEffect(() => {
+    if (confirmStep !== 1) return
+    Promise.all([
+      lifeDB.days.count(),
+      lifeDB.todos.count(),
+      lifeDB.habitLogs.count(),
+    ]).then(([days, tasks, habits]) => setDataCounts({ days, tasks, habits }))
+  }, [confirmStep])
+
+  async function buildAndShareExport() {
+    const now = new Date()
+    const ts  = now.toISOString().replace(/:/g, '-').replace(/\..+/, '')
+    const payload = {
+      version:    3,
+      exportedAt: now.toISOString(),
+      days:       await lifeDB.days.toArray(),
+      todos:      await lifeDB.todos.toArray(),
+      hobbies:    await lifeDB.hobbies.toArray(),
+      settings:   await lifeDB.settings.toArray(),
+      habitLogs:  await lifeDB.habitLogs.toArray(),
+      chatLogs:   await lifeDB.chatLogs.toArray(),
+    }
+    const json = JSON.stringify(payload, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const name = `lifelog-backup-${ts}.json`
+    const file = new File([blob], name, { type: 'application/json' })
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Life Log Backup' })
+    } else {
+      const url = URL.createObjectURL(blob)
+      const a   = document.createElement('a')
+      a.href     = url
+      a.download = name
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 3000)
+    }
+    return `${payload.days.length} days · ${payload.todos.length} tasks · ${payload.habitLogs.length} habit logs`
+  }
 
   async function exportData() {
     setExportState('exporting')
     try {
-      const now = new Date()
-      const ts  = now.toISOString().replace(/:/g, '-').replace(/\..+/, '') // e.g. 2026-07-15T14-32-00
-      const payload = {
-        version:    3,
-        exportedAt: now.toISOString(),
-        days:       await lifeDB.days.toArray(),
-        todos:      await lifeDB.todos.toArray(),
-        hobbies:    await lifeDB.hobbies.toArray(),
-        settings:   await lifeDB.settings.toArray(),
-        habitLogs:  await lifeDB.habitLogs.toArray(),
-        chatLogs:   await lifeDB.chatLogs.toArray(),
-      }
-      setExportSummary(`${payload.days.length} days · ${payload.todos.length} tasks · ${payload.habitLogs.length} habit logs`)
-      const json = JSON.stringify(payload, null, 2)
-      const blob = new Blob([json], { type: 'application/json' })
-      const name = `lifelog-backup-${ts}.json`
-      const file = new File([blob], name, { type: 'application/json' })
-
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Life Log Backup' })
-      } else {
-        const url = URL.createObjectURL(blob)
-        const a   = document.createElement('a')
-        a.href     = url
-        a.download = name
-        a.click()
-        // Delay revoke so the browser has time to start the download
-        setTimeout(() => URL.revokeObjectURL(url), 3000)
-      }
+      const summary = await buildAndShareExport()
+      setExportSummary(summary)
       setExportState('done')
       setTimeout(() => setExportState('idle'), 3000)
     } catch {
       setExportState('error')
       setTimeout(() => setExportState('idle'), 3000)
+    }
+  }
+
+  async function preWipeExport() {
+    setPreWipeState('exporting')
+    try {
+      const summary = await buildAndShareExport()
+      setPreWipeSummary(summary)
+      setPreWipeState('done')
+    } catch {
+      setPreWipeState('error')
+      setTimeout(() => setPreWipeState('idle'), 3000)
     }
   }
 
@@ -720,7 +748,7 @@ function DataSection() {
   }
 
   async function wipeEverything() {
-    setConfirmStep(2)
+    setConfirmStep(3)
     try {
       await Dexie.delete('LifeOS')
       localStorage.clear()
@@ -731,6 +759,21 @@ function DataSection() {
 
   return (
     <Section>
+      {/* Uninstall reminder banner */}
+      <div className="rounded-2xl px-4 py-3 flex gap-3 items-start"
+        style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.18)' }}>
+        <span style={{ fontSize: 16, lineHeight: 1, marginTop: 1 }}>⚠️</span>
+        <div>
+          <p style={{ color: '#fbbf24', fontSize: 12, fontWeight: 600, marginBottom: 3 }}>
+            Planning to uninstall?
+          </p>
+          <p style={{ color: '#888', fontSize: 11, lineHeight: 1.55 }}>
+            Android won't warn you — all your logs, tasks and habits will be gone permanently.
+            Export a backup from here before uninstalling.
+          </p>
+        </div>
+      </div>
+
       {/* Export */}
       <div className="rounded-2xl overflow-hidden" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
         <div className="px-4 pt-4 pb-2">
@@ -791,6 +834,8 @@ function DataSection() {
           </p>
         </div>
         <div className="px-4 pb-4">
+
+          {/* Step 0 — initial button */}
           {confirmStep === 0 && (
             <button onClick={() => setConfirmStep(1)}
               className="w-full py-3 rounded-xl text-sm font-semibold transition-all active:opacity-70"
@@ -798,7 +843,60 @@ function DataSection() {
               Reset all data
             </button>
           )}
+
+          {/* Step 1 — save your data first */}
           {confirmStep === 1 && (
+            <div className="flex flex-col gap-3">
+              {/* Header */}
+              <div className="rounded-xl px-3 py-3" style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                <p className="text-[#fbbf24] text-xs font-semibold mb-1">Save your data first</p>
+                <p className="text-[#888] text-[11px] leading-relaxed">
+                  {dataCounts
+                    ? `You have ${dataCounts.days} days of logs, ${dataCounts.tasks} tasks and ${dataCounts.habits} habit check-ins. Download a backup — there's no undo after this.`
+                    : 'Download a backup before wiping — there\'s no undo.'}
+                </p>
+              </div>
+
+              {/* Export button */}
+              {preWipeState !== 'done' ? (
+                <button
+                  onClick={preWipeExport}
+                  disabled={preWipeState === 'exporting'}
+                  className="w-full py-3 rounded-xl text-sm font-semibold transition-all active:opacity-70 disabled:opacity-50"
+                  style={{ background: '#a78bfa18', border: '1px solid #a78bfa44', color: '#a78bfa' }}>
+                  {preWipeState === 'exporting' ? 'Saving…' : preWipeState === 'error' ? 'Failed — try again' : 'Save backup to Downloads'}
+                </button>
+              ) : (
+                <div className="rounded-xl px-3 py-2.5 flex items-center gap-2"
+                  style={{ background: 'rgba(74,222,128,0.07)', border: '1px solid rgba(74,222,128,0.25)' }}>
+                  <span style={{ color: '#4ade80', fontSize: 14 }}>✓</span>
+                  <span style={{ color: '#4ade80', fontSize: 11, fontWeight: 600 }}>Backup saved</span>
+                  {preWipeSummary && (
+                    <span style={{ color: '#555', fontSize: 10, marginLeft: 'auto' }}>{preWipeSummary}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Action row */}
+              <div className="flex gap-2">
+                <button onClick={() => { setConfirmStep(0); setPreWipeState('idle'); setDataCounts(null) }}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-medium active:opacity-70"
+                  style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', color: '#888' }}>
+                  Cancel
+                </button>
+                <button onClick={() => setConfirmStep(2)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold active:opacity-70"
+                  style={preWipeState === 'done'
+                    ? { background: '#f8717120', border: '1px solid #f8717155', color: '#f87171' }
+                    : { background: '#2a2a2a', border: '1px solid #3a3a3a', color: '#555' }}>
+                  {preWipeState === 'done' ? 'Continue →' : 'Skip backup →'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2 — final confirmation */}
+          {confirmStep === 2 && (
             <div className="flex flex-col gap-2">
               <p className="text-[#f87171] text-xs text-center font-medium">
                 Are you absolutely sure? Everything will be gone.
@@ -817,9 +915,12 @@ function DataSection() {
               </div>
             </div>
           )}
-          {confirmStep === 2 && (
+
+          {/* Step 3 — wiping */}
+          {confirmStep === 3 && (
             <p className="text-[#555] text-xs text-center py-2">Wiping data…</p>
           )}
+
         </div>
       </div>
     </Section>
