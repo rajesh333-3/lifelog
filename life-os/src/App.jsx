@@ -10,6 +10,7 @@ import { EisenhowerBoard } from './components/Eisenhower/EisenhowerBoard'
 import { Settings } from './components/Settings/Settings'
 import { CalendarTrigger, CalendarPicker } from './components/Calendar/CalendarPicker'
 import { WelcomeTour } from './components/Tour/WelcomeTour'
+import { SearchOverlay } from './components/Search/SearchOverlay'
 import { todayStr } from './utils/dateUtils'
 import { seedCommitmentTasks } from './db'
 
@@ -32,8 +33,9 @@ const NAV = [
 
 export default function App() {
   const { profile, loaded, load } = useSettingsStore()
-  const [activeTab, setActiveTab] = useState('grid')
-  const [showTour, setShowTour]   = useState(false)
+  const [activeTab,   setActiveTab]   = useState('grid')
+  const [showTour,    setShowTour]    = useState(false)
+  const [showSearch,  setShowSearch]  = useState(false)
 
   const openDayView  = useAppStore(s => s.openDayView)
   const selectedDate = useAppStore(s => s.selectedDate)
@@ -83,7 +85,7 @@ export default function App() {
 
   return (
     <div className="min-h-dvh bg-[#0a0a0a] flex flex-col select-none">
-      <Header profile={profile} onReplayTour={() => setShowTour(true)} />
+      <Header profile={profile} onReplayTour={() => setShowTour(true)} onSearch={() => setShowSearch(true)} />
 
       <AnimatePresence>
         {showTour && (
@@ -130,10 +132,20 @@ export default function App() {
 
       <BottomNav active={activeTab} onChange={(tab) => { closePanel(); setActiveTab(tab) }} />
 
-      {/* DayView overlay — opened from grid dot tap */}
+      {/* DayView overlay — opened from grid dot tap or search result */}
       <AnimatePresence>
         {activePanel === 'dayView' && selectedDate && (
           <DayView key={selectedDate} initialDate={selectedDate} asOverlay />
+        )}
+      </AnimatePresence>
+
+      {/* Search overlay */}
+      <AnimatePresence>
+        {showSearch && (
+          <SearchOverlay
+            onClose={() => setShowSearch(false)}
+            onSelectDate={(date) => { openDayView(date); setShowSearch(false) }}
+          />
         )}
       </AnimatePresence>
     </div>
@@ -141,7 +153,7 @@ export default function App() {
 }
 
 /* ── Header ── */
-function Header({ profile }) {
+function Header({ profile, onSearch }) {
   const [totalsMode, setTotals] = useState(false)
   const [calOpen, setCalOpen]   = useState(false)
 
@@ -208,6 +220,18 @@ function Header({ profile }) {
             {firstName}
           </span>
         </div>
+
+        {/* Search trigger */}
+        <button
+          onClick={onSearch}
+          className="w-9 h-9 rounded-full bg-[#141414] flex items-center justify-center shrink-0 active:scale-95 transition-transform"
+          style={{ border: '1px solid #242424' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="7" cy="7" r="4.5" stroke="#555" strokeWidth="1.4"/>
+            <path d="M11 11l3 3" stroke="#555" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+        </button>
 
         {/* Calendar trigger */}
         <CalendarTrigger dob={profile.dob} onOpen={() => setCalOpen(true)} />
