@@ -180,6 +180,121 @@ export default function App() {
   )
 }
 
+/* ── Search hint data ── */
+const SEARCH_HINTS = [
+  { text: 'great gym session…',      color: '#4ade80' },
+  { text: 'felt anxious today…',     color: '#f87171' },
+  { text: 'productive deep work…',   color: '#a78bfa' },
+  { text: 'coffee with a friend…',   color: '#60a5fa' },
+  { text: "couldn't sleep well…",    color: '#fbbf24' },
+  { text: 'meditation morning…',     color: '#34d399' },
+  { text: 'hit my goal today…',      color: '#4ade80' },
+  { text: 'rough week overall…',     color: '#f97316' },
+  { text: 'cleared my task list…',   color: '#a78bfa' },
+  { text: 'journaled about stress…', color: '#fb7185' },
+]
+
+/* ── Animated search bar ── */
+function AnimatedSearchBar({ onClick }) {
+  const [idx,     setIdx]     = useState(0)
+  const [hovered, setHovered] = useState(false)
+
+  useEffect(() => {
+    const t = setInterval(() => setIdx(i => (i + 1) % SEARCH_HINTS.length), 2800)
+    return () => clearInterval(t)
+  }, [])
+
+  const hint = SEARCH_HINTS[idx]
+
+  return (
+    <motion.button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="flex items-center gap-2.5 w-full active:scale-[0.97]"
+      animate={{
+        boxShadow: hovered
+          ? '0 0 0 1.5px rgba(167,139,250,0.35), 0 0 18px rgba(167,139,250,0.12)'
+          : '0 0 0 1px rgba(255,255,255,0.07)',
+        backgroundColor: hovered
+          ? 'rgba(167,139,250,0.07)'
+          : 'rgba(255,255,255,0.04)',
+      }}
+      transition={{ duration: 0.18 }}
+      style={{
+        borderRadius:            11,
+        padding:                 '7px 12px',
+        border:                  'none',
+        cursor:                  'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        overflow:                'hidden',
+        height:                  36,
+      }}
+    >
+      {/* Search icon */}
+      <motion.div
+        className="shrink-0"
+        animate={hovered ? { scale: 1.15 } : { scale: 1 }}
+        transition={{ duration: 0.18 }}
+      >
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <circle cx="5.5" cy="5.5" r="4"
+            stroke={hovered ? '#a78bfa' : '#666'}
+            strokeWidth="1.4"
+            style={{ transition: 'stroke 0.18s' }}
+          />
+          <path d="M9 9l2.5 2.5"
+            stroke={hovered ? '#a78bfa' : '#666'}
+            strokeWidth="1.4" strokeLinecap="round"
+            style={{ transition: 'stroke 0.18s' }}
+          />
+        </svg>
+      </motion.div>
+
+      {/* Cycling hint text */}
+      <div className="flex-1 min-w-0 relative" style={{ height: 18, overflow: 'hidden' }}>
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={idx}
+            initial={{ opacity: 0, y: 9 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={  { opacity: 0, y: -9 }}
+            transition={{ duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] }}
+            style={{
+              position:      'absolute',
+              inset:         0,
+              display:       'flex',
+              alignItems:    'center',
+              fontSize:      12,
+              fontWeight:    500,
+              color:         hint.color,
+              whiteSpace:    'nowrap',
+              overflow:      'hidden',
+              textOverflow:  'ellipsis',
+              letterSpacing: '0.01em',
+            }}
+          >
+            {hint.text}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+
+      {/* Tap hint */}
+      <span style={{
+        fontSize:   9,
+        fontWeight: 500,
+        color:      hovered ? 'rgba(167,139,250,0.7)' : 'rgba(255,255,255,0.18)',
+        flexShrink: 0,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        transition: 'color 0.18s',
+      }}>
+        search
+      </span>
+    </motion.button>
+  )
+}
+
 /* ── Header ── */
 function Header({ profile, onSearch }) {
   const [totalsMode, setTotals] = useState(false)
@@ -188,116 +303,100 @@ function Header({ profile, onSearch }) {
   const firstName = profile.name?.split(' ')[0] ?? profile.name
 
   return (
-    <header className="flex items-center gap-3 px-4 shrink-0 border-b border-[#222]"
-      style={{ paddingTop: `calc(env(safe-area-inset-top) + 10px)`, paddingBottom: 10 }}>
+    <header
+      className="flex items-center gap-2.5 px-3 shrink-0 border-b border-[#1a1a1a]"
+      style={{ paddingTop: `calc(env(safe-area-inset-top) + 9px)`, paddingBottom: 9 }}
+    >
+      {/* Logo */}
+      <img
+        src="/icons/icon-192.png"
+        alt="Life Log"
+        style={{
+          width:        34,
+          height:       34,
+          borderRadius: 10,
+          objectFit:    'cover',
+          flexShrink:   0,
+          boxShadow:    '0 0 0 1px rgba(167,139,250,0.15), 0 2px 10px rgba(167,139,250,0.18)',
+        }}
+      />
 
-        {/* App logo */}
-        <img
-          src="/icons/icon-192.png"
-          alt="Life Log"
-          style={{
-            width:        38,
-            height:       38,
-            borderRadius: 11,
-            objectFit:    'cover',
-            flexShrink:   0,
-            boxShadow:    '0 0 0 1px rgba(167,139,250,0.15), 0 2px 12px rgba(167,139,250,0.2)',
-          }}
-        />
+      {/* Brand · name — fixed width, no shrink */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span style={{
+          fontFamily:    "'Outfit', system-ui, sans-serif",
+          fontSize:      16,
+          fontWeight:    800,
+          color:         '#f0f0f0',
+          letterSpacing: '-0.5px',
+          lineHeight:    1,
+        }}>
+          Life Log
+        </span>
+        <span style={{
+          width:        4,
+          height:       4,
+          borderRadius: '50%',
+          background:   'rgba(167,139,250,0.4)',
+          flexShrink:   0,
+        }} />
+        <span style={{
+          fontFamily:    "'Outfit', system-ui, sans-serif",
+          fontSize:      13,
+          fontWeight:    300,
+          fontStyle:     'italic',
+          color:         '#c4b5fd',
+          letterSpacing: '0.1px',
+          lineHeight:    1,
+          maxWidth:      72,
+          overflow:      'hidden',
+          textOverflow:  'ellipsis',
+          whiteSpace:    'nowrap',
+        }}>
+          {firstName}
+        </span>
+      </div>
 
-        {/* Brand · username */}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span style={{
-            fontFamily:    "'Outfit', system-ui, sans-serif",
-            fontSize:      18,
-            fontWeight:    800,
-            color:         '#f0f0f0',
-            letterSpacing: '-0.6px',
-            lineHeight:    1,
-            flexShrink:    0,
-          }}>
-            Life Log
-          </span>
+      {/* Animated search bar — fills all remaining space */}
+      <div className="flex-1 min-w-0">
+        <AnimatedSearchBar onClick={onSearch} />
+      </div>
 
-          {/* Bullet separator */}
-          <span style={{
-            width:        5,
-            height:       5,
-            borderRadius: '50%',
-            background:   'rgba(167,139,250,0.45)',
-            flexShrink:   0,
-            marginBottom: 1,
-          }} />
-
-          {/* First name — Outfit light italic, purple tint */}
-          <span
-            className="truncate"
-            style={{
-              fontFamily:    "'Outfit', system-ui, sans-serif",
-              fontSize:      14,
-              fontWeight:    300,
-              fontStyle:     'italic',
-              color:         '#c4b5fd',
-              letterSpacing: '0.1px',
-              lineHeight:    1,
-              minWidth:      0,
-            }}
-          >
-            {firstName}
-          </span>
-        </div>
-
-        {/* Search trigger */}
+      {/* Age pill — fixed, no shrink */}
+      {age && (
         <button
-          onClick={onSearch}
-          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 active:scale-95 transition-all"
-          style={{ background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.22)' }}
+          onClick={() => setTotals(t => !t)}
+          className="shrink-0 active:scale-95 transition-transform"
+          style={{
+            display:                 'flex',
+            alignItems:              'center',
+            gap:                     6,
+            background:              'rgba(167,139,250,0.07)',
+            border:                  '1px solid rgba(167,139,250,0.16)',
+            borderRadius:            11,
+            padding:                 '5px 9px',
+            cursor:                  'pointer',
+            WebkitTapHighlightColor: 'transparent',
+          }}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <circle cx="7" cy="7" r="4.5" stroke="#a78bfa" strokeWidth="1.4"/>
-            <path d="M11 11l3 3" stroke="#a78bfa" strokeWidth="1.4" strokeLinecap="round"/>
-          </svg>
+          <AgeStat n={age.years} u="yr" size={17} color="#a78bfa" glow />
+          <div style={{ width: 1, height: 12, background: 'rgba(167,139,250,0.18)' }} />
+
+          {totalsMode ? (
+            <>
+              <AgeStat n={age.totalWeeks.toLocaleString()} u="wk" size={12} color="#7c6fe0" />
+              <div style={{ width: 1, height: 12, background: 'rgba(167,139,250,0.18)' }} />
+              <AgeStat n={age.totalDays.toLocaleString()}  u="d"  size={11} color="#5348a8" />
+            </>
+          ) : (
+            <>
+              <AgeStat n={age.months} u="mo" size={12} color="#7c6fe0" />
+              <div style={{ width: 1, height: 12, background: 'rgba(167,139,250,0.18)' }} />
+              <AgeStat n={age.days}   u="d"  size={11} color="#5348a8" />
+            </>
+          )}
         </button>
-
-        {/* Live age pill */}
-        {age && (
-          <button
-            onClick={() => setTotals(t => !t)}
-            style={{
-              display:                 'flex',
-              alignItems:              'center',
-              gap:                     8,
-              background:              'rgba(167,139,250,0.07)',
-              border:                  '1px solid rgba(167,139,250,0.16)',
-              borderRadius:            12,
-              padding:                 '5px 11px',
-              flexShrink:              0,
-              cursor:                  'pointer',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <AgeStat n={age.years} u="yr" size={19} color="#a78bfa" glow />
-            <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
-
-            {totalsMode ? (
-              <>
-                <AgeStat n={age.totalWeeks.toLocaleString()} u="wk" size={14} color="#7c6fe0" />
-                <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
-                <AgeStat n={age.totalDays.toLocaleString()}  u="d"  size={12} color="#5348a8" />
-              </>
-            ) : (
-              <>
-                <AgeStat n={age.months} u="mo" size={14} color="#7c6fe0" />
-                <div style={{ width: 1, height: 14, background: 'rgba(167,139,250,0.18)' }} />
-                <AgeStat n={age.days}   u="d"  size={12} color="#5348a8" />
-              </>
-            )}
-
-            <svg width="9" height="9" viewBox="0 0 10 10" fill="none" style={{ marginLeft: 2, opacity: 0.3 }}>
-              <path d="M1 3h8M7 1l2 2-2 2M9 7H1M3 5l-2 2 2 2" stroke="#a78bfa" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        )}
+      )}
     </header>
   )
 }
