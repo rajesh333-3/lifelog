@@ -672,15 +672,30 @@ function DataSection() {
     const summary = `${payload.days.length} days · ${payload.todos.length} tasks · ${payload.habitLogs.length} habit logs`
 
     if (Capacitor.isNativePlatform()) {
-      // Write to Documents — shows up in the Files app under Documents.
-      // On Android 10+ no permission needed (MediaStore). On older Android
-      // WRITE_EXTERNAL_STORAGE in the manifest covers it.
-      await Filesystem.writeFile({
+      // Write to app Cache (no permissions, simple file I/O — avoids MediaStore crashes).
+      // Share.share opens Android share sheet; user taps Save to Files or Drive to keep it.
+      const result = await Filesystem.writeFile({
         path:      name,
         data:      json,
-        directory: Directory.Documents,
+        directory: Directory.Cache,
         encoding:  Encoding.UTF8,
       })
+      try {
+        await Share.share({
+          title:       'Life Log Backup',
+          url:         result.uri,
+          dialogTitle: 'Save to Files, Drive or email',
+        })
+      } catch (e) {
+        // Share cancelled/dismissed — not a failure, file was written
+        const msg = (e?.message ?? '').toLowerCase()
+        if (!msg.includes('cancel') && !msg.includes('dismiss') && !msg.includes('progress')) {
+          throw e
+        }
+      }
+      setTimeout(() => {
+        Filesystem.deleteFile({ path: name, directory: Directory.Cache }).catch(() => {})
+      }, 60000)
     } else {
       // Web browser: create a download link and click it.
       // navigator.share() is not used because the user-gesture context is
@@ -797,7 +812,9 @@ function DataSection() {
         <div className="px-4 pt-4 pb-2">
           <p className="text-[#f0f0f0] text-sm font-semibold mb-1">Export backup</p>
           <p className="text-[#888] text-xs leading-relaxed">
-            Saves all logs, tasks, and habits as a timestamped JSON file — each export is uniquely named so you can keep multiple versions.
+            {Capacitor.isNativePlatform()
+              ? 'A share sheet will open — tap Save to Files or Google Drive to keep your backup.'
+              : 'Saves all logs, tasks, and habits as a timestamped JSON file downloaded to your device.'}
           </p>
         </div>
         <div className="px-4 pb-4 flex flex-col gap-2">
@@ -807,15 +824,15 @@ function DataSection() {
             className="w-full py-3 rounded-xl text-sm font-semibold transition-all active:opacity-70 disabled:opacity-50"
             style={{ background: '#a78bfa18', border: '1px solid #a78bfa33', color: '#a78bfa' }}
           >
-            {exportState === 'exporting' ? 'Exporting…'
-              : exportState === 'done'      ? '✓ Saved to Documents'
+            {exportState === 'exporting' ? 'Preparing backup…'
+              : exportState === 'done'      ? '✓ Share sheet opened'
               : exportState === 'error'     ? 'Export failed — try again'
               : 'Export data'}
           </button>
           {exportState === 'done' && exportSummary && (
             <div className="flex flex-col gap-0.5">
               <p className="text-[10px] text-center" style={{ color: '#4ade80' }}>
-                {Capacitor.isNativePlatform() ? 'Find it in Files → Documents' : 'Check your Downloads folder'}
+                {Capacitor.isNativePlatform() ? 'Tap Save to Files or Drive in the menu' : 'Check your Downloads folder'}
               </p>
               <p className="text-[10px] text-center" style={{ color: '#686868' }}>{exportSummary}</p>
             </div>
