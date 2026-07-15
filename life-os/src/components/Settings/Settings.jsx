@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Dexie from 'dexie'
 import { Capacitor } from '@capacitor/core'
-import { Filesystem, Directory } from '@capacitor/filesystem'
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
 import { useSettingsStore } from '../../store/useSettingsStore'
 import { useLLM } from '../AIChat/useLLM'
@@ -667,26 +667,36 @@ function DataSection() {
       habitLogs:  await lifeDB.habitLogs.toArray(),
       chatLogs:   await lifeDB.chatLogs.toArray(),
     }
-    const json    = JSON.stringify(payload, null, 2)
+    const json    = JSON.stringify(payload)
     const name    = `lifelog-backup-${ts}.json`
     const summary = `${payload.days.length} days · ${payload.todos.length} tasks · ${payload.habitLogs.length} habit logs`
 
     if (Capacitor.isNativePlatform()) {
-      // Write to app cache dir then open Android/iOS native share sheet
+      // Write to app cache dir then open Android/iOS native share sheet.
+      // Use files[] (not url:) so Share sets the correct MIME type and grants
+      // URI permissions properly. Don't delete the cache file until after the
+      // share resolves — async upload targets (Drive, etc.) may still be reading.
       const result = await Filesystem.writeFile({
         path:      name,
         data:      json,
         directory: Directory.Cache,
-        encoding:  'utf8',
+        encoding:  Encoding.UTF8,
       })
-      await Share.share({
-        title:       'Life Log Backup',
-        text:        `Life Log backup — ${summary}`,
-        url:         result.uri,
-        dialogTitle: 'Save your Life Log backup',
-      })
-      // Clean up the cached file after sharing
-      await Filesystem.deleteFile({ path: name, directory: Directory.Cache }).catch(() => {})
+      try {
+        await Share.share({
+          title:       'Life Log Backup',
+          files:       [result.uri],
+          dialogTitle: 'Save your Life Log backup',
+        })
+      } catch (shareErr) {
+        // "Share canceled" / user dismissed the sheet — not a fatal error
+        const msg = (shareErr?.message ?? String(shareErr)).toLowerCase()
+        if (!msg.includes('cancel') && !msg.includes('dismiss')) throw shareErr
+      }
+      // Cleanup after a short delay so uploaders have time to read the stream
+      setTimeout(() => {
+        Filesystem.deleteFile({ path: name, directory: Directory.Cache }).catch(() => {})
+      }, 5000)
     } else {
       // Web browser fallback
       const blob = new Blob([json], { type: 'application/json' })

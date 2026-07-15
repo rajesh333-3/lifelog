@@ -1,3 +1,9 @@
+# Preserve Kotlin metadata for Ionic's filesystem lib and Capacitor plugins
+# so R8/D8 doesn't corrupt coroutine state machines or reflection metadata.
+-keep class io.ionic.libs.** { *; }
+-keep class com.capacitorjs.plugins.filesystem.** { *; }
+-keepattributes *Annotation*, Signature, EnclosingMethod, InnerClasses
+
 # Add project specific ProGuard rules here.
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
