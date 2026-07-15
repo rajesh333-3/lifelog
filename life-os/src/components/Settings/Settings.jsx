@@ -21,12 +21,12 @@ export function Settings({ onReplayTour }) {
       <div className="px-4 py-3 border-b border-[#1a1a1a] shrink-0 flex items-center justify-between">
         <div>
           <h1 className="text-[#f0f0f0] text-sm font-medium">Settings</h1>
-          <p className="text-[#444] text-xs mt-0.5">Profile, AI, pillars & reminders</p>
+          <p className="text-[#666] text-xs mt-0.5">Profile, AI, pillars & reminders</p>
         </div>
         <button
           onClick={onReplayTour}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium active:opacity-60 transition-opacity"
-          style={{ background: '#141414', border: '1px solid #242424', color: '#555' }}
+          style={{ background: '#141414', border: '1px solid #242424', color: '#888' }}
         >
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
             <path d="M2 6a4 4 0 1 0 4-4V1L4 3l2 2V4a3 3 0 1 1-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
@@ -49,7 +49,7 @@ export function Settings({ onReplayTour }) {
             className="shrink-0 py-2 px-3 text-xs font-medium rounded-xl transition-all"
             style={{
               background: section === id ? '#1e1e1e' : 'transparent',
-              color:      section === id ? '#a78bfa' : '#444',
+              color:      section === id ? '#a78bfa' : '#777',
               border:     `1px solid ${section === id ? '#2a2a2a' : 'transparent'}`,
             }}
           >
@@ -185,10 +185,6 @@ function ProfileSection() {
         </CardRow>
       </Card>
       <SaveBtn onSave={save} />
-      <NextReleaseBanner
-        title="Data Export & Import"
-        description="All your logs are stored only on this device. Export and backup support is coming next release — until then, keep regular device backups to avoid data loss."
-      />
     </Section>
   )
 }
@@ -638,24 +634,29 @@ function HabitsSettings() {
 function DataSection() {
   const [confirmStep,  setConfirmStep]  = useState(0)
   const [exportState,  setExportState]  = useState('idle')  // idle | exporting | done | error
+  const [exportSummary, setExportSummary] = useState(null)
   const [importState,  setImportState]  = useState('idle')  // idle | importing | done | error
   const fileInputRef = useRef(null)
 
   async function exportData() {
     setExportState('exporting')
     try {
+      const now = new Date()
+      const ts  = now.toISOString().replace(/:/g, '-').replace(/\..+/, '') // e.g. 2026-07-15T14-32-00
       const payload = {
-        version:    2,
-        exportedAt: new Date().toISOString(),
+        version:    3,
+        exportedAt: now.toISOString(),
         days:       await lifeDB.days.toArray(),
         todos:      await lifeDB.todos.toArray(),
         hobbies:    await lifeDB.hobbies.toArray(),
         settings:   await lifeDB.settings.toArray(),
         habitLogs:  await lifeDB.habitLogs.toArray(),
+        chatLogs:   await lifeDB.chatLogs.toArray(),
       }
+      setExportSummary(`${payload.days.length} days · ${payload.todos.length} tasks · ${payload.habitLogs.length} habit logs`)
       const json = JSON.stringify(payload, null, 2)
       const blob = new Blob([json], { type: 'application/json' })
-      const name = `lifelog-backup-${new Date().toISOString().slice(0, 10)}.json`
+      const name = `lifelog-backup-${ts}.json`
       const file = new File([blob], name, { type: 'application/json' })
 
       if (navigator.canShare?.({ files: [file] })) {
@@ -666,35 +667,49 @@ function DataSection() {
         a.href     = url
         a.download = name
         a.click()
-        URL.revokeObjectURL(url)
+        // Delay revoke so the browser has time to start the download
+        setTimeout(() => URL.revokeObjectURL(url), 3000)
       }
       setExportState('done')
       setTimeout(() => setExportState('idle'), 3000)
     } catch {
-      setExportState('idle')
+      setExportState('error')
+      setTimeout(() => setExportState('idle'), 3000)
     }
   }
 
   async function importData(e) {
     const file = e.target.files?.[0]
     if (!file) return
+    // Reset input so the same file can be re-selected if needed
+    e.target.value = ''
     setImportState('importing')
     try {
       const text    = await file.text()
       const payload = JSON.parse(text)
-      if (!payload.version || !payload.days) throw new Error('invalid backup')
+      if (!payload.version || !Array.isArray(payload.days)) throw new Error('invalid backup')
 
-      await lifeDB.days.clear()
-      await lifeDB.todos.clear()
-      await lifeDB.hobbies.clear()
-      await lifeDB.settings.clear()
-      await lifeDB.habitLogs.clear()
+      // Wrap everything in a transaction — if any step fails the DB rolls back
+      // and the user's existing data is untouched
+      await lifeDB.transaction('rw',
+        [lifeDB.days, lifeDB.todos, lifeDB.hobbies, lifeDB.settings, lifeDB.habitLogs, lifeDB.chatLogs],
+        async () => {
+          await lifeDB.days.clear()
+          await lifeDB.todos.clear()
+          await lifeDB.hobbies.clear()
+          await lifeDB.settings.clear()
+          await lifeDB.habitLogs.clear()
+          await lifeDB.chatLogs.clear()
 
-      if (payload.days?.length)      await lifeDB.days.bulkAdd(payload.days)
-      if (payload.todos?.length)     await lifeDB.todos.bulkAdd(payload.todos)
-      if (payload.hobbies?.length)   await lifeDB.hobbies.bulkAdd(payload.hobbies)
-      if (payload.settings?.length)  await lifeDB.settings.bulkAdd(payload.settings)
-      if (payload.habitLogs?.length) await lifeDB.habitLogs.bulkAdd(payload.habitLogs)
+          // bulkPut handles duplicate keys gracefully (safe on retries)
+          if (payload.days?.length)      await lifeDB.days.bulkPut(payload.days)
+          if (payload.todos?.length)     await lifeDB.todos.bulkPut(payload.todos)
+          if (payload.hobbies?.length)   await lifeDB.hobbies.bulkPut(payload.hobbies)
+          if (payload.settings?.length)  await lifeDB.settings.bulkPut(payload.settings)
+          if (payload.habitLogs?.length) await lifeDB.habitLogs.bulkPut(payload.habitLogs)
+          if (payload.chatLogs?.length)  await lifeDB.chatLogs.bulkPut(payload.chatLogs)
+        }
+      )
 
       setImportState('done')
       setTimeout(() => window.location.reload(), 1200)
@@ -720,19 +735,25 @@ function DataSection() {
       <div className="rounded-2xl overflow-hidden" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
         <div className="px-4 pt-4 pb-2">
           <p className="text-[#f0f0f0] text-sm font-semibold mb-1">Export backup</p>
-          <p className="text-[#555] text-xs leading-relaxed">
-            Save all your logs, tasks, and habits as a JSON file. Use this before uninstalling.
+          <p className="text-[#888] text-xs leading-relaxed">
+            Saves all logs, tasks, and habits as a timestamped JSON file — each export is uniquely named so you can keep multiple versions.
           </p>
         </div>
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 flex flex-col gap-2">
           <button
             onClick={exportData}
             disabled={exportState === 'exporting'}
             className="w-full py-3 rounded-xl text-sm font-semibold transition-all active:opacity-70 disabled:opacity-50"
             style={{ background: '#a78bfa18', border: '1px solid #a78bfa33', color: '#a78bfa' }}
           >
-            {exportState === 'exporting' ? 'Exporting…' : exportState === 'done' ? '✓ Exported' : 'Export data'}
+            {exportState === 'exporting' ? 'Exporting…'
+              : exportState === 'done'      ? '✓ Exported'
+              : exportState === 'error'     ? 'Export failed — try again'
+              : 'Export data'}
           </button>
+          {exportState === 'done' && exportSummary && (
+            <p className="text-[10px] text-center" style={{ color: '#686868' }}>{exportSummary}</p>
+          )}
         </div>
       </div>
 
@@ -740,7 +761,7 @@ function DataSection() {
       <div className="rounded-2xl overflow-hidden" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
         <div className="px-4 pt-4 pb-2">
           <p className="text-[#f0f0f0] text-sm font-semibold mb-1">Restore backup</p>
-          <p className="text-[#555] text-xs leading-relaxed">
+          <p className="text-[#888] text-xs leading-relaxed">
             Pick a previously exported JSON file to restore your data. Current data will be replaced.
           </p>
         </div>
@@ -765,7 +786,7 @@ function DataSection() {
       <div className="rounded-2xl overflow-hidden" style={{ background: '#141414', border: '1px solid #2a2a2a' }}>
         <div className="px-4 py-4">
           <p className="text-[#f87171] text-sm font-semibold mb-1">Danger Zone</p>
-          <p className="text-[#555] text-xs leading-relaxed">
+          <p className="text-[#888] text-xs leading-relaxed">
             Permanently deletes all logs, tasks, habits, and settings. No undo.
           </p>
         </div>

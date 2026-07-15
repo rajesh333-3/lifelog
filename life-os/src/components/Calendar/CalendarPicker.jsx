@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db'
@@ -151,9 +151,19 @@ export function CalendarPicker({ dob, open, onClose }) {
     setViewMonth(d.getMonth())
   }
 
+  // Swipe left/right to navigate months
+  const swipeStartX = useRef(null)
+  function onTouchStart(e) { swipeStartX.current = e.touches[0].clientX }
+  function onTouchEnd(e) {
+    if (swipeStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - swipeStartX.current
+    if (dx > 55) prevMonth()
+    else if (dx < -55) nextMonth()
+    swipeStartX.current = null
+  }
+
   function pickDate(date) {
-    if (date > today) return  // don't open future days from calendar
-    openDayView(date)
+    openDayView(date)  // future dates open in task-scheduling mode
     onClose()
   }
 
@@ -178,9 +188,9 @@ export function CalendarPicker({ dob, open, onClose }) {
             style={{
               zIndex:        65,
               bottom:        0,
-              background:    'rgba(12,12,12,0.97)',
+              background:    'rgba(14,14,14,0.98)',
               backdropFilter:'blur(32px) saturate(180%)',
-              border:        '1px solid rgba(255,255,255,0.07)',
+              border:        '1px solid rgba(255,255,255,0.09)',
               borderBottom:  'none',
               paddingBottom: 'calc(56px + env(safe-area-inset-bottom))',
             }}
@@ -188,6 +198,8 @@ export function CalendarPicker({ dob, open, onClose }) {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 380, damping: 40, mass: 0.85 }}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
           >
             {/* Drag handle */}
             <div className="flex justify-center pt-3 pb-0.5">
@@ -195,35 +207,37 @@ export function CalendarPicker({ dob, open, onClose }) {
             </div>
 
             {/* Month navigation */}
-            <div className="flex items-center px-5 py-3 gap-3">
+            <div className="flex items-center px-4 py-3 gap-3">
               <button
                 onClick={prevMonth}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[#555] active:text-[#f0f0f0] active:bg-white/05 transition-colors"
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M9 2L4 7l5 5" stroke="#aaa" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
 
-              <button onClick={goToday} className="flex-1 text-center active:opacity-60">
+              <button onClick={goToday} className="flex-1 text-center active:opacity-60 py-1">
                 <p style={{
                   fontFamily:    "'Outfit', system-ui, sans-serif",
-                  fontSize:      16,
+                  fontSize:      17,
                   fontWeight:    700,
                   color:         '#f0f0f0',
                   letterSpacing: '-0.3px',
                 }}>
                   {MONTH_NAMES[viewMonth]}
                 </p>
-                <p className="text-[11px] text-[#444] mt-0.5">{viewYear}</p>
+                <p className="text-[11px] mt-0.5" style={{ color: '#686868' }}>{viewYear} · tap to return to today</p>
               </button>
 
               <button
                 onClick={nextMonth}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[#555] active:text-[#f0f0f0] active:bg-white/05 transition-colors"
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M5 2l5 5-5 5" stroke="#aaa" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
             </div>
@@ -232,7 +246,7 @@ export function CalendarPicker({ dob, open, onClose }) {
             <div className="grid grid-cols-7 px-4 mb-1">
               {DAY_LABELS.map(l => (
                 <div key={l} className="flex items-center justify-center h-7">
-                  <span className="text-[10px] font-semibold text-[#333] uppercase tracking-widest">{l}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#686868' }}>{l}</span>
                 </div>
               ))}
             </div>
@@ -266,8 +280,7 @@ export function CalendarPicker({ dob, open, onClose }) {
                         <button
                           key={date}
                           onClick={() => pickDate(date)}
-                          disabled={isFutureD}
-                          className="flex flex-col items-center justify-center h-12 gap-0.5 active:opacity-50 transition-opacity disabled:cursor-default"
+                          className="flex flex-col items-center justify-center h-12 gap-0.5 active:opacity-50 transition-opacity"
                         >
                           {/* Date number */}
                           <div
@@ -283,12 +296,14 @@ export function CalendarPicker({ dob, open, onClose }) {
                                 : isHovered
                                   ? '#c4b5fd'
                                   : isFutureD
-                                    ? '#282828'
+                                    ? '#404040'
                                     : isPast && !hasData
-                                      ? '#383838'
+                                      ? '#555'
                                       : '#e0e0e0',
                               fontWeight: isToday || isHovered ? 700 : 400,
                               fontFamily: "'Inter', system-ui, sans-serif",
+                              border: isFutureD ? '1px dashed #2e2e2e' : 'none',
+                              borderRadius: '50%',
                             }}
                           >
                             {parseInt(date.slice(8))}
@@ -321,7 +336,7 @@ export function CalendarPicker({ dob, open, onClose }) {
               ].map(([color, label]) => (
                 <div key={label} className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-                  <span className="text-[9px] text-[#333] uppercase tracking-widest">{label}</span>
+                  <span className="text-[9px] text-[#666] uppercase tracking-widest">{label}</span>
                 </div>
               ))}
             </div>

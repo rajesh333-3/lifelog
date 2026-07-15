@@ -36,6 +36,7 @@ export default function App() {
   const [activeTab,   setActiveTab]   = useState('grid')
   const [showTour,    setShowTour]    = useState(false)
   const [showSearch,  setShowSearch]  = useState(false)
+  const [calOpen,     setCalOpen]     = useState(false)
 
   const openDayView  = useAppStore(s => s.openDayView)
   const selectedDate = useAppStore(s => s.selectedDate)
@@ -97,8 +98,15 @@ export default function App() {
         <AnimatePresence mode="wait">
           {activeTab === 'grid' && (
             <TabPanel key="grid">
-              <div className="h-full overflow-auto px-3 py-3">
-                <LifeGrid dob={profile.dob} lifeExpectancy={profile.lifeExpectancy} />
+              <div className="h-full flex flex-col overflow-hidden px-3 py-3">
+                {profile?.dob && (
+                  <div className="flex justify-end mb-2 px-1 shrink-0">
+                    <CalendarTrigger dob={profile.dob} onOpen={() => setCalOpen(true)} />
+                  </div>
+                )}
+                <div className="flex-1 min-h-0">
+                  <LifeGrid dob={profile.dob} lifeExpectancy={profile.lifeExpectancy} />
+                </div>
               </div>
             </TabPanel>
           )}
@@ -139,6 +147,9 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      {/* Calendar picker — lives at app level, triggered from grid tab */}
+      <CalendarPicker dob={profile.dob} open={calOpen} onClose={() => setCalOpen(false)} />
+
       {/* Search overlay */}
       <AnimatePresence>
         {showSearch && (
@@ -155,15 +166,13 @@ export default function App() {
 /* ── Header ── */
 function Header({ profile, onSearch }) {
   const [totalsMode, setTotals] = useState(false)
-  const [calOpen, setCalOpen]   = useState(false)
 
   const age       = profile.dob ? computeAge(profile.dob) : null
   const firstName = profile.name?.split(' ')[0] ?? profile.name
 
   return (
-    <>
-      <header className="flex items-center gap-3 px-4 shrink-0 border-b border-[#1a1a1a]"
-        style={{ paddingTop: `calc(env(safe-area-inset-top) + 10px)`, paddingBottom: 10 }}>
+    <header className="flex items-center gap-3 px-4 shrink-0 border-b border-[#222]"
+      style={{ paddingTop: `calc(env(safe-area-inset-top) + 10px)`, paddingBottom: 10 }}>
 
         {/* App logo */}
         <img
@@ -224,17 +233,14 @@ function Header({ profile, onSearch }) {
         {/* Search trigger */}
         <button
           onClick={onSearch}
-          className="w-9 h-9 rounded-full bg-[#141414] flex items-center justify-center shrink-0 active:scale-95 transition-transform"
-          style={{ border: '1px solid #242424' }}
+          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 active:scale-95 transition-all"
+          style={{ background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.22)' }}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <circle cx="7" cy="7" r="4.5" stroke="#555" strokeWidth="1.4"/>
-            <path d="M11 11l3 3" stroke="#555" strokeWidth="1.4" strokeLinecap="round"/>
+            <circle cx="7" cy="7" r="4.5" stroke="#a78bfa" strokeWidth="1.4"/>
+            <path d="M11 11l3 3" stroke="#a78bfa" strokeWidth="1.4" strokeLinecap="round"/>
           </svg>
         </button>
-
-        {/* Calendar trigger */}
-        <CalendarTrigger dob={profile.dob} onOpen={() => setCalOpen(true)} />
 
         {/* Live age pill */}
         {age && (
@@ -275,10 +281,7 @@ function Header({ profile, onSearch }) {
             </svg>
           </button>
         )}
-      </header>
-
-      <CalendarPicker dob={profile.dob} open={calOpen} onClose={() => setCalOpen(false)} />
-    </>
+    </header>
   )
 }
 
@@ -335,12 +338,13 @@ function computeAge(dob) {
 function BottomNav({ active, onChange }) {
   return (
     <nav
-      className="grid shrink-0 border-t border-[#1a1a1a] bg-[#0a0a0a]"
+      className="grid shrink-0 bg-[#0d0d0d]"
       style={{
         gridTemplateColumns: `repeat(${NAV.length}, 1fr)`,
         paddingBottom: 'env(safe-area-inset-bottom)',
         position: 'relative',
         zIndex: 50,
+        borderTop: '1px solid rgba(255,255,255,0.07)',
       }}
     >
       {NAV.map(({ id, label, icon: Icon }) => {
@@ -353,8 +357,8 @@ function BottomNav({ active, onChange }) {
           >
             <Icon active={isActive} />
             <span
-              className="text-[9px] uppercase tracking-widest font-medium transition-colors duration-150"
-              style={{ color: isActive ? '#a78bfa' : '#555' }}
+              className="text-[9px] uppercase tracking-widest font-semibold transition-colors duration-150"
+              style={{ color: isActive ? '#a78bfa' : '#707070' }}
             >
               {label}
             </span>
@@ -398,7 +402,7 @@ function ComingSoon({ tab }) {
 
 /* ── Nav icons ── */
 function GridIcon({ active }) {
-  const c = active ? '#a78bfa' : '#555'
+  const c = active ? '#a78bfa' : '#686868'
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <rect x="2" y="2" width="7" height="7" rx="1.5" fill={c} />
@@ -410,7 +414,7 @@ function GridIcon({ active }) {
 }
 
 function TodayIcon({ active }) {
-  const c = active ? '#a78bfa' : '#555'
+  const c = active ? '#a78bfa' : '#686868'
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <rect x="3" y="4" width="14" height="13" rx="2" stroke={c} strokeWidth="1.5" />
@@ -422,7 +426,7 @@ function TodayIcon({ active }) {
 }
 
 function InsightsIcon({ active }) {
-  const c = active ? '#a78bfa' : '#555'
+  const c = active ? '#a78bfa' : '#686868'
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <path d="M2 15l4.5-5.5 4 3.5 4-6 3.5 3" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -434,7 +438,7 @@ function InsightsIcon({ active }) {
 }
 
 function TasksIcon({ active }) {
-  const c = active ? '#a78bfa' : '#555'
+  const c = active ? '#a78bfa' : '#686868'
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <rect x="2" y="2" width="7" height="7" rx="1" stroke={c} strokeWidth="1.5" />
@@ -446,7 +450,7 @@ function TasksIcon({ active }) {
 }
 
 function SettingsIcon({ active }) {
-  const c = active ? '#a78bfa' : '#555'
+  const c = active ? '#a78bfa' : '#686868'
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
       <circle cx="10" cy="10" r="2.5" stroke={c} strokeWidth="1.5" />

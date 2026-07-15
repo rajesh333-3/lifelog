@@ -99,6 +99,7 @@ export function DayView({ initialDate, asOverlay = false }) {
       lifeEvent:     dayData.lifeEvent     ?? false,
       lifeEventNote: dayData.lifeEventNote ?? '',
       voiceNote:     dayData.voiceNote     ?? '',
+      reminder:      dayData.reminder      ?? '',
     } : emptyDay())
   }, [date, dayData?.date])
 
@@ -116,9 +117,12 @@ export function DayView({ initialDate, asOverlay = false }) {
       return
     }
 
-    const overall = overallScore(merged.physical, merged.mental, merged.work)
-    merged.overallScore = overall
-    merged.color        = merged.lifeEvent ? '#60a5fa' : scoreToColor(overall)
+    // Don't derive scores for future dates — they have no real pillar data yet
+    if (!isFuture(date)) {
+      const overall = overallScore(merged.physical, merged.mental, merged.work)
+      merged.overallScore = overall
+      merged.color        = merged.lifeEvent ? '#60a5fa' : scoreToColor(overall)
+    }
     await db.days.put(merged)
     setSaveState('saved')
     saveStateTimer.current = setTimeout(() => setSaveState('idle'), 2200)
@@ -196,7 +200,7 @@ export function DayView({ initialDate, asOverlay = false }) {
         {/* Date nav */}
         <div className="flex items-center gap-2">
           <button onClick={() => goDay(-1)}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[#444] active:text-[#f0f0f0]">
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[#777] active:text-[#f0f0f0]">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
@@ -204,13 +208,13 @@ export function DayView({ initialDate, asOverlay = false }) {
           <div className="text-center min-w-[110px]">
             <p className="text-[#f0f0f0] text-sm font-medium">{formatDate(date)}</p>
             <p className="text-[10px] uppercase tracking-widest" style={{
-              color: isTod ? '#a78bfa' : isFut ? '#fbbf24' : '#444'
+              color: isTod ? '#a78bfa' : isFut ? '#fbbf24' : '#666'
             }}>
               {isTod ? 'Today' : isFut ? 'Future' : 'Past'}
             </p>
           </div>
           <button onClick={() => goDay(1)}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[#444] active:text-[#f0f0f0]">
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[#777] active:text-[#f0f0f0]">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
@@ -238,8 +242,8 @@ export function DayView({ initialDate, asOverlay = false }) {
         {isFut && <div className="w-9 h-9" />}
       </div>
 
-      {/* 7-day strip */}
-      {profile?.dob && (
+      {/* 7-day strip — hidden for future dates (reminder-only view needs no navigation strip) */}
+      {profile?.dob && !isFut && (
         <WeekStrip date={date} dob={profile.dob} onSelect={setDate} />
       )}
 
@@ -247,13 +251,43 @@ export function DayView({ initialDate, asOverlay = false }) {
       <div className="flex-1 overflow-y-auto no-scrollbar">
         <div className="max-w-lg mx-auto">
 
-          {/* ── FUTURE mode ── */}
+          {/* ── FUTURE mode — reminders only ── */}
           {isFut && (
-            <div className="px-4 pt-5 pb-10 flex flex-col gap-5">
-              <FutureNotice />
-              <Section title="Schedule">
-                <TaskSection date={date} futureOnly />
-              </Section>
+            <div className="px-4 pt-5 pb-10 flex flex-col gap-4">
+              {/* Date banner */}
+              <div className="rounded-2xl px-4 py-3.5 flex items-center gap-3"
+                style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.14)' }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6.5" stroke="#fbbf24" strokeWidth="1.3"/>
+                  <path d="M8 5v3.5l2 1.5" stroke="#fbbf24" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <div>
+                  <p className="text-[13px] font-medium" style={{ color: '#fbbf24' }}>Future date</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: '#78716c' }}>You can leave yourself a reminder for this day.</p>
+                </div>
+              </div>
+
+              {/* Reminder input */}
+              <div className="rounded-2xl overflow-hidden"
+                style={{ background: '#111', border: '1px solid #1e1e1e' }}>
+                <div className="flex items-center gap-2 px-4 pt-3.5 pb-1">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M6 1a3.5 3.5 0 013.5 3.5c0 2-1 3-1.5 4H4c-.5-1-1.5-2-1.5-4A3.5 3.5 0 016 1z" stroke="#fbbf24" strokeWidth="1.2"/>
+                    <path d="M4.5 8.5h3M5.25 10h1.5" stroke="#fbbf24" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#fbbf24' }}>
+                    Reminder
+                  </p>
+                </div>
+                <textarea
+                  value={local.reminder}
+                  onChange={e => update('reminder', e.target.value)}
+                  placeholder="e.g. Doctor appointment at 3pm, call Mom, pick up groceries…"
+                  rows={4}
+                  className="w-full bg-transparent text-[#d0d0d0] text-sm px-4 pb-4 pt-1 placeholder:text-[#2e2e2e] resize-none focus:outline-none leading-relaxed"
+                  style={{ minHeight: 96 }}
+                />
+              </div>
             </div>
           )}
 
@@ -346,7 +380,7 @@ export function DayView({ initialDate, asOverlay = false }) {
       </div>
 
       {/* Auto-save indicator — subtle top-right badge, no blocking button */}
-      {isTod && saveState !== 'idle' && (
+      {(isTod || isFut) && saveState !== 'idle' && (
         <div className="absolute top-[60px] right-3 pointer-events-none" style={{ zIndex: 10 }}>
           <motion.div
             initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
@@ -551,14 +585,6 @@ function ReadOnlyCard({ label, text }) {
 }
 
 /* ── Notices ── */
-function FutureNotice() {
-  return (
-    <div className="rounded-2xl px-4 py-4" style={{ background: '#141414', border: '1px solid #242424' }}>
-      <p className="text-[#505050] text-sm font-medium">This day hasn't been written yet.</p>
-      <p className="text-[#343434] text-xs mt-1">You can schedule tasks here to get ahead.</p>
-    </div>
-  )
-}
 
 function PastNotice({ onEdit }) {
   return (
@@ -628,7 +654,7 @@ function VoiceJournal({ value, onChange }) {
               <span className="text-[11px] text-[#f87171] font-medium">Listening…</span>
             </motion.div>
           ) : (
-            <span className="text-[10px] text-[#333]">
+            <span className="text-[10px] text-[#666]">
               {wordCount > 0 ? `${wordCount} word${wordCount !== 1 ? 's' : ''}` : 'Voice or type'}
             </span>
           )}
@@ -638,7 +664,7 @@ function VoiceJournal({ value, onChange }) {
           {value && !listening && (
             <button
               onClick={() => onChange('')}
-              className="text-[10px] text-[#333] hover:text-[#f87171] transition-colors px-2 py-1"
+              className="text-[10px] text-[#666] hover:text-[#f87171] transition-colors px-2 py-1"
             >
               Clear
             </button>
@@ -681,7 +707,7 @@ function emptyDay() {
     physicalNote: '', mentalNote: '', workNote: '',
     wentWell: '', couldBeBetter: '',
     lifeEvent: false, lifeEventNote: '',
-    voiceNote: '',
+    voiceNote: '', reminder: '',
   }
 }
 
@@ -697,6 +723,7 @@ function isDayEmpty(d) {
     !d.wentWell?.trim() &&
     !d.couldBeBetter?.trim() &&
     !d.voiceNote?.trim() &&
-    !d.lifeEventNote?.trim()
+    !d.lifeEventNote?.trim() &&
+    !d.reminder?.trim()
   )
 }

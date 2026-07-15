@@ -208,7 +208,7 @@ export function TaskSection({ date, futureOnly, readOnly }) {
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addTask()}
                   placeholder="What needs to be done?"
-                  className="bg-transparent text-[#f0f0f0] text-sm placeholder:text-[#333] focus:outline-none w-full"
+                  className="bg-transparent text-[#f0f0f0] text-sm placeholder:text-[#555] focus:outline-none w-full"
                 />
 
                 {/* Pillar picker */}
@@ -220,7 +220,7 @@ export function TaskSection({ date, futureOnly, readOnly }) {
                       <button key={p} type="button" onClick={() => setPillar(p)}
                         className="flex-1 text-[11px] font-medium rounded-full py-1.5 transition-all active:scale-95 min-h-[32px] flex items-center justify-center gap-1"
                         style={{
-                          color:      active ? cfg.color : '#444',
+                          color:      active ? cfg.color : '#777',
                           background: active ? cfg.bg    : 'transparent',
                           border:     `1px solid ${active ? cfg.color + '55' : '#2a2a2a'}`,
                         }}>
@@ -258,7 +258,7 @@ export function TaskSection({ date, futureOnly, readOnly }) {
                 {/* Due date (future days only) */}
                 {isFuture(date) && (
                   <div className="flex items-center gap-2">
-                    <span className="text-[#444] text-xs shrink-0">Due date</span>
+                    <span className="text-[#777] text-xs shrink-0">Due date</span>
                     <input
                       type="date"
                       value={dueDate}
@@ -278,7 +278,7 @@ export function TaskSection({ date, futureOnly, readOnly }) {
                   >Add task</button>
                   <button
                     onClick={() => { setAdding(false); setInput('') }}
-                    className="px-4 border border-[#2a2a2a] rounded-lg text-[#555] text-xs min-h-[40px] active:opacity-70"
+                    className="px-4 border border-[#2a2a2a] rounded-lg text-[#888] text-xs min-h-[40px] active:opacity-70"
                   >Cancel</button>
                 </div>
               </div>
@@ -286,7 +286,7 @@ export function TaskSection({ date, futureOnly, readOnly }) {
           ) : (
             <button
               onClick={() => setAdding(true)}
-              className="flex items-center gap-2 text-[#444] text-sm py-2 active:text-[#a78bfa] transition-colors min-h-[40px]"
+              className="flex items-center gap-2 text-[#777] text-sm py-2 active:text-[#a78bfa] transition-colors min-h-[40px]"
             >
               <span className="text-lg leading-none">+</span>
               <span>Add task</span>
@@ -400,9 +400,9 @@ function TaskRow({ task, isDone, pending = 0, onToggle, onUpdate, onDelete, fade
 
       {/* Title + pending indicator */}
       <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-        <span className={`text-sm leading-snug ${isDone ? 'line-through text-[#333]' : 'text-[#e0e0e0]'}`}>
+        <span className={`text-sm leading-snug ${isDone ? 'line-through text-[#555]' : 'text-[#e0e0e0]'}`}>
           {task.source === 'commitment' && (
-            <span className="text-[10px] text-[#444] mr-1.5 font-medium uppercase tracking-wider">commitment</span>
+            <span className="text-[10px] text-[#666] mr-1.5 font-medium uppercase tracking-wider">commitment</span>
           )}
           {task.title}
         </span>

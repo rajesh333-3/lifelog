@@ -134,6 +134,10 @@ export function LifeGrid({ dob, lifeExpectancy }) {
         style={{
           display: 'grid',
           gridTemplateColumns: `28px repeat(${COLS}, 1fr)`,
+          // gridAutoRows matches each dot's width so dots are always square.
+          // px consumed: left-24 + right-24 (px-3 in parent) + px-8+px-8 (px-2 here)
+          //              + label-28 + 52 gaps of 1px = 120px
+          gridAutoRows: 'calc((100vw - 120px) / 52)',
           gap: GAP,
         }}
         onMouseOver={handleMouseOver}

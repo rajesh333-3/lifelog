@@ -103,10 +103,10 @@ export function SearchOverlay({ onClose, onSelectDate }) {
                   <path d="M12.5 12.5L16 16" stroke="#383838" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
               </div>
-              <p className="text-[#383838] text-sm text-center leading-relaxed">
+              <p className="text-[#666] text-sm text-center leading-relaxed">
                 Try <Hint>gym</Hint>, <Hint>stressed</Hint>, <Hint>met Arjun</Hint>, or <Hint>bad day</Hint>
               </p>
-              <p className="text-[10px] text-[#2a2a2a] uppercase tracking-widest text-center">
+              <p className="text-[10px] text-[#444] uppercase tracking-widest text-center">
                 Searches notes · reflections · tasks · habits
               </p>
             </motion.div>
@@ -119,8 +119,8 @@ export function SearchOverlay({ onClose, onSelectDate }) {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="px-5 pt-10 flex flex-col items-center gap-2"
             >
-              <p className="text-[#383838] text-sm">No matching days found.</p>
-              <p className="text-[10px] text-[#2a2a2a] uppercase tracking-widest">
+              <p className="text-[#666] text-sm">No matching days found.</p>
+              <p className="text-[10px] text-[#444] uppercase tracking-widest">
                 Try different words or a broader phrase
               </p>
             </motion.div>
@@ -133,7 +133,7 @@ export function SearchOverlay({ onClose, onSelectDate }) {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="px-4 pt-3 pb-6 flex flex-col gap-2"
             >
-              <p className="text-[10px] text-[#333] uppercase tracking-widest px-1 pb-1">
+              <p className="text-[10px] text-[#555] uppercase tracking-widest px-1 pb-1">
                 {results.length} result{results.length !== 1 ? 's' : ''}
               </p>
               {results.map((r, i) => (
@@ -182,15 +182,15 @@ function ResultCard({ result, index, onSelect }) {
           <span className="text-[10px] text-[#383838]">{dow}</span>
         </div>
         {snippet ? (
-          <p className="text-[12px] text-[#555] leading-relaxed line-clamp-2">{snippet}</p>
+          <p className="text-[12px] text-[#888] leading-relaxed line-clamp-2">{snippet}</p>
         ) : (
-          <p className="text-[11px] text-[#333] italic">Tap to view this day</p>
+          <p className="text-[11px] text-[#555] italic">Tap to view this day</p>
         )}
       </div>
 
       {/* Chevron */}
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0 mt-1">
-        <path d="M5 3l4 4-4 4" stroke="#2a2a2a" strokeWidth="1.5" strokeLinecap="round"/>
+        <path d="M5 3l4 4-4 4" stroke="#484848" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     </motion.button>
   )
