@@ -47,7 +47,7 @@ function pendingDays(task, date) {
   return Math.max(0, Math.floor((current - created) / 86400000))
 }
 
-export function TaskSection({ date, futureOnly, readOnly }) {
+export function TaskSection({ date, readOnly }) {
   const [input,     setInput]     = useState('')
   const [dueDate,   setDueDate]   = useState(date)
   const [urgent,    setUrgent]    = useState(false)

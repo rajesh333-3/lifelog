@@ -14,15 +14,6 @@ import { SearchOverlay } from './components/Search/SearchOverlay'
 import { todayStr } from './utils/dateUtils'
 import { seedCommitmentTasks } from './db'
 
-const LOADING_QUOTES = [
-  'Capture today.\nUnderstand yesterday.\nShape tomorrow.',
-  'Life is short.\nLook at your grid.',
-  'Every dot is a week\nyou\'ll never get back —\nor one you can still shape.',
-  'Write your story,\none day at a time.',
-  'The weeks don\'t wait.\nBut you still have time.',
-  'Small days\nbuild extraordinary years.',
-]
-
 const NAV = [
   { id: 'grid',     label: 'Grid',     icon: GridIcon },
   { id: 'today',    label: 'Today',    icon: TodayIcon },
@@ -34,7 +25,6 @@ const NAV = [
 export default function App() {
   const { profile, loaded, load } = useSettingsStore()
   const [activeTab,   setActiveTab]   = useState('grid')
-  const [tabDir,      setTabDir]      = useState(0)
   const [showTour,    setShowTour]    = useState(false)
   const [showSearch,  setShowSearch]  = useState(false)
   const [calOpen,     setCalOpen]     = useState(false)
@@ -100,7 +90,7 @@ export default function App() {
   return (
     <>
     <div className="min-h-dvh bg-[#0a0a0a] flex flex-col select-none">
-      <Header profile={profile} onReplayTour={() => setShowTour(true)} onSearch={() => setShowSearch(true)} />
+      <Header profile={profile} onSearch={() => setShowSearch(true)} />
 
       <AnimatePresence>
         {showTour && (

@@ -17,21 +17,3 @@ export function scoreToColor(score) {
   return `hsl(${hue.toFixed(1)}, ${sat.toFixed(0)}%, ${lit.toFixed(0)}%)`
 }
 
-// Map color token to label (approximate; used for legacy display only)
-export function colorToLabel(color) {
-  if (!color) return 'unlogged'
-  // Kept for backwards compat — new colors are HSL strings, not fixed tokens
-  if (color === '#60a5fa') return 'milestone'
-  return 'logged'
-}
-
-// Derive color string from label (legacy pillar-goal display)
-export function labelToColor(label) {
-  const map = {
-    green:     scoreToColor(85),
-    yellow:    scoreToColor(50),
-    red:       scoreToColor(15),
-    milestone: '#60a5fa',
-  }
-  return map[label] ?? null
-}

@@ -1,126 +1,147 @@
 # Life Log
 
-> *Capture today. Understand yesterday. Shape tomorrow.*  
-> Write your story, one day at a time.
+> *Capture today. Understand yesterday. Shape tomorrow.*
 
-Life Log is a private, offline-first personal life-tracking PWA. Every piece of data lives on your device — no accounts, no servers, no cloud.
+Life Log is a private, offline-first personal life-tracking PWA and Android app. Every piece of data lives on your device — no accounts, no servers, no cloud sync.
 
-**Live app:** https://exquisite-maamoul-fbc403.netlify.app
+**Live web app:** https://exquisite-maamoul-fbc403.netlify.app  
+**Android APK:** `android/app/release/app-release.apk` (sideload or share via Drive)
 
 ---
 
-## Use it right now — no install needed
-
-The app is a PWA. You can install it on your home screen in seconds, no App Store required.
+## Install — no App Store needed
 
 ### iPhone / iPad (Safari)
-1. Open **Safari** and go to https://exquisite-maamoul-fbc403.netlify.app
-2. Tap the **Share** button (box with arrow at the bottom of the screen)
-3. Scroll down and tap **Add to Home Screen**
-4. Tap **Add** — the app icon appears on your home screen
-5. Open it from the home screen — it runs full-screen, works offline, and feels native
+1. Open Safari → go to the URL above
+2. Tap **Share** → **Add to Home Screen** → **Add**
+3. Opens full-screen, works offline
 
-> Chrome on iOS does **not** support Add to Home Screen properly. Use Safari.
+> Use Safari only — Chrome on iOS doesn't support Add to Home Screen correctly.
 
 ### Android (Chrome)
-1. Open **Chrome** and go to https://exquisite-maamoul-fbc403.netlify.app
-2. Tap the **three-dot menu** (top right)
-3. Tap **Add to Home Screen** or **Install app**
-4. Tap **Install** — the app installs like a native app
-5. Open from your home screen — full-screen, offline-ready
-
-> Samsung Internet also supports this. Firefox on Android does not.
+1. Open Chrome → go to the URL above
+2. Tap **⋮ → Add to Home Screen → Install**
+3. Or sideload the release APK directly
 
 ---
 
-## What's in v1
+## What's in the app
 
 ### Life Grid
-Your entire life visualised as a grid of weeks. Each dot is one week — lived weeks fill with colour based on how you logged them. Tap any dot to open that week's log or revisit the past.
+Your entire lifespan visualised as a grid of week-dots. Each dot = one week.
+
+- **Cinematic intro** — the grid pans from birth to your current week on every launch
+- **Free pan & zoom** — drag, pinch, or mouse-wheel to explore any era of your life
+- **Score colours** — smooth 0→100 HSL spectrum: deep red → amber → rich green. Every 10-point step is visually distinct
+- **Dot states** — scored past (vivid colour), unscored past (cool blue-gray), current week (purple conic fill + pulse ring), future (faint outline)
+- **Hover glow** — dots brighten with a drop-shadow as your cursor passes over them
+- **Tap a dot** — opens a 50/50 split: grid stays in the top half, a week detail drawer slides up from the bottom showing all 7 days with scores, dates, and a tap-to-open button
 
 ### Daily Log
-Log each day across three pillars (Physical, Mental, Work) with 0–100 sliders. Add a reflection, a voice journal entry, and mark life events. Auto-saves as you type.
+Log each day across three pillars — Physical 💪, Mental 🧠, Work 💼.
+
+- Task completion per pillar auto-derives the pillar score (0–100)
+- Reflection fields ("What went well" / "Could be better") with inline mic
+- Voice journal with append-mode dictation (tap mic → speak → appends to text)
+- Life Event toggle — marks the day blue in the grid
+- Past days are read-only by default; an Edit button unlocks them
+- Future days show only tasks and reminders
 
 ### Habits
-Track daily habits per pillar. Toggle them done each day — streaks and consistency tracked automatically.
+Create habits per pillar with an emoji. Tap chips each day to check them off.
 
-### Eisenhower Task Matrix
-Drag tasks into four quadrants: Do Now, Schedule, Delegate, Drop. Tasks float forward every day until you close them — nothing falls through the cracks.
+### Tasks & Eisenhower Matrix
+- Tasks created on any day auto-float forward until closed — nothing gets lost
+- Commitment tasks seed from your pillar goals and are non-deletable
+- **Eisenhower Board** — full-height 2×2 matrix (Do Now / Schedule / Delegate / Drop) with drag-and-drop rearranging between quadrants
 
-### Insights
-Pillar trend charts over 7, 30, or 90 days. Streaks, best days, and an AI-generated weekly narrative (requires AI configuration in Settings).
+### AI Insights
+Connect Gemini Flash (cloud) or Ollama (local) in Settings → AI for a weekly narrative check-in. The app works fully without AI — it's entirely optional.
 
-### Calendar Picker
-Tap the date button in the header to open a month calendar. Hover the life grid to highlight that week in the calendar live.
+### Search
+Animated search bar in the header fills the space between your name and your age pill. Cycles through 12 real-feeling episodic memory queries ("that night we played hockey so late…", "felt sad when my puppy fell sick…") to remind you what the search can find. Opens a full-screen overlay with live results across notes, reflections, tasks, and habits.
 
-### AI Integration
-Connect Ollama (local) or Gemini (cloud) in Settings → AI to unlock the weekly narrative. The app works fully without AI — it is entirely optional.
+### Calendar
+Tap the date chip (top-right of grid) to open a full month calendar. Hovering the life grid highlights that week in the calendar in real time.
 
-### Welcome Tour
-A 6-slide onboarding tour shown on first launch. Replay anytime via Settings → Tour.
+### Data Export & Import
+Settings → Data → Export backs up all days, tasks, habits, and chat logs as a timestamped JSON file (`lifelog-backup-YYYY-MM-DDThh-mm-ss.json`). Import restores from any backup file. A post-export summary shows how many records were saved.
 
----
-
-## Pending — Next Release
-
-These features are visible in the UI but not yet active. A notice is shown in the app when you try to use them.
-
-| Feature | Status | Notes |
-|---|---|---|
-| **Push Notifications** | Coming next release | Reminder times can be set in Settings → Reminders but no notifications fire yet. Web Push + service worker integration pending. |
-| **Data Export & Import** | Coming next release | All data lives in IndexedDB on-device. Until export is implemented, clearing browser storage or uninstalling the app will erase all data permanently. **Back up your device regularly in the meantime.** |
-| **Native App (iOS / Android)** | In progress | Capacitor projects generated. Requires Xcode / Android Studio to build. See below. |
-| **Hobbies in Insights** | Coming next release | Hobby logs are tracked per day but not yet visualised in the Insights charts. |
+### Onboarding & Tour
+First-run wizard collects your name, date of birth, life expectancy, pillar goals, and commitment tasks. A 6-slide welcome tour plays after onboarding — replay anytime from Settings → Tour.
 
 ---
 
-## Native app development (Capacitor)
+## Score colour system
 
-The `ios/` and `android/` Capacitor projects are already generated in this repo.
+Scores are 0–100. The colour is an HSL interpolation — not buckets:
 
-### Prerequisites
+| Score | Colour | Feeling |
+|-------|--------|---------|
+| 0     | Deep red | hsl(0, 80%, 47%) |
+| 25    | Orange | hsl(34, 86%, 51%) |
+| 50    | Amber-yellow | hsl(68, 90%, 55%) — brightest |
+| 75    | Yellow-green | hsl(101, 87%, 50%) |
+| 100   | Rich green | hsl(135, 80%, 47%) |
 
-**Android**
-- [Android Studio](https://developer.android.com/studio) (includes the Android SDK and emulator)
-- Java 17+ (Android Studio bundles it)
+A score of 90 and 100 are both green but clearly distinct shades. A score of 0 and 10 are both red but distinct.
 
-**iOS**
-- Mac with [Xcode](https://apps.apple.com/app/xcode/id497799835) installed (free, App Store)
-- CocoaPods — install via Homebrew:
-  ```bash
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  brew install cocoapods
-  ```
-- Then add the iOS platform (one-time):
-  ```bash
-  npx cap add ios
-  ```
+---
 
-### Run on device or simulator
+## Android build & deploy
 
+### Dev server (WiFi testing)
 ```bash
-# 1. Build the web app
+cd life-os
+npm run dev -- --host
+# Phone opens http://<your-mac-ip>:5173
+```
+
+### Build release APK
+```bash
 npm run build
-
-# 2. Push web assets to native projects
-npx cap sync
-
-# 3. Open in Android Studio
-npx cap open android
-
-# 4. Open in Xcode (requires iOS setup above)
-npx cap open ios
+npx cap sync android
+# Android Studio → Build → Generate Signed APK → release
 ```
+Output: `android/app/release/app-release.apk`
 
-In Android Studio: wait for Gradle sync → click **Run**. Select a device or emulator.  
-In Xcode: select your target device → click **Run** (▶).
-
-### Keeping native projects in sync
-
-Any time you change code, rebuild and sync:
+### Install on phone via USB
 ```bash
-npm run build && npx cap sync
+adb install -r android/app/release/app-release.apk
+# First time (signature mismatch from debug):
+adb uninstall com.rajeshtvd.lifeos
+adb install android/app/release/app-release.apk
 ```
+
+### Keystore
+- File: `android/lifelog-release.jks`
+- Store password / key password: `lifelog123`
+- Alias: `lifelog`
+- App ID: `com.rajeshtvd.lifeos`
+
+### Sharing with friends
+Upload `app-release.apk` to Google Drive and share the download link.
+**Do not use WhatsApp** — it compresses and corrupts APKs.
+
+---
+
+## Play Store path (when ready)
+
+**Blockers:** $25 Google Play developer account + a live privacy policy URL.
+
+**Content for the privacy policy:** All data stored on-device only. No data collected or shared except optional Gemini API calls initiated by the user.
+
+**Build an `.aab`** (Play Store requires this, not `.apk`):
+```bash
+npm run build && npx cap sync android
+# Android Studio → Build → Generate Signed Bundle → Android App Bundle
+```
+
+**Release tracks:**
+- *Internal testing* — instant, no review, max 100 testers. Share via a real Play Store link (no "unknown sources" warning).
+- *Production* — Google review ~1–3 days.
+
+**Before each new release:** bump `versionCode` and `versionName` in `android/app/build.gradle`.
 
 ---
 
@@ -130,14 +151,14 @@ npm run build && npx cap sync
 |---|---|
 | Framework | React 18 + Vite 8 |
 | Styling | Tailwind CSS v4 |
-| Animation | Framer Motion |
-| Database | Dexie.js (IndexedDB) |
+| Animation | Framer Motion v12 |
+| Database | Dexie.js v4 (IndexedDB) |
 | State | Zustand |
-| Charts | Recharts |
 | Drag & drop | @dnd-kit/core |
 | PWA | vite-plugin-pwa + Workbox |
-| Native | Capacitor 8 (iOS + Android) |
+| Native | Capacitor 8 (Android) |
 | Fonts | Outfit + Inter (Google Fonts) |
+| AI | Gemini Flash API or Ollama (local) |
 
 ---
 
@@ -146,35 +167,29 @@ npm run build && npx cap sync
 ```bash
 # Node 20+ required
 nvm use 20
-
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # production build → dist/
-npm run preview    # preview the production build
 ```
 
-## Deploying
-
-Drag the `dist/` folder to [netlify.com/drop](https://app.netlify.com/drop) for a one-click deploy.
-
-Or serve with any static host — the app is entirely client-side.
+Deploy: drag `dist/` to [netlify.com/drop](https://app.netlify.com/drop).
 
 ---
 
 ## Data & privacy
 
-- **All data is on your device.** Nothing is ever sent to a server.
-- The only network requests are Google Fonts (loaded at startup) and optionally your AI provider (Ollama or Gemini) when generating narratives.
-- Clearing browser data or uninstalling will permanently delete all logs. Export is coming in the next release — until then, keep regular device backups.
+All data is stored in IndexedDB on your device. The app makes no network requests except:
+- Google Fonts on first load (cached by the service worker after that)
+- Your AI provider (Gemini or Ollama) — only when you explicitly trigger an Insights generation
+
+Clearing browser storage or uninstalling the app will erase all data. Use Settings → Data → Export regularly to keep backups.
 
 ---
 
 ## Roadmap
 
-- [ ] Push notification reminders
-- [ ] JSON export & import (full backup/restore)
-- [ ] Capacitor iOS + Android packaging → App Store / Play Store
-- [ ] Hobbies in Insights charts
+- [ ] Push notification reminders (times configurable in Settings → Reminders; delivery pending)
+- [ ] Streak tracking (habit streaks, task completion streaks)
+- [ ] Play Store submission (needs dev account + privacy policy URL)
+- [ ] Weekly review summary screen
 - [ ] iCloud / Google Drive sync (optional)
-- [ ] Lock screen widget (native only)
-- [ ] Shareable day card (single-day image export)

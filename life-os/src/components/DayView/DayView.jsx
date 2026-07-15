@@ -9,7 +9,6 @@ import {
   weekDates, dateToWeekIndex, toDateStr,
 } from '../../utils/dateUtils'
 import { overallScore, scoreToColor } from '../../utils/scoreUtils'
-import { PillarReadOnly } from './PillarReadOnly'
 import { TaskSection } from './TaskSection'
 import { HobbySection } from './HobbySection'
 import { HabitsSection } from './HabitsSection'
