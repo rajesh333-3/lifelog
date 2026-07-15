@@ -2,8 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Dexie from 'dexie'
 import { Capacitor } from '@capacitor/core'
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
-import { Share } from '@capacitor/share'
+import { registerPlugin } from '@capacitor/core'
+
+// Custom plugin — pure Java, no ionfilesystemlib, no Kotlin coroutines.
+// Writes JSON to app cache and opens the Android share sheet directly.
+const FileExport = registerPlugin('FileExport')
 import { useSettingsStore } from '../../store/useSettingsStore'
 import { useLLM } from '../AIChat/useLLM'
 import { db as lifeDB, getHabits, saveHabits } from '../../db'
@@ -672,30 +675,13 @@ function DataSection() {
     const summary = `${payload.days.length} days · ${payload.todos.length} tasks · ${payload.habitLogs.length} habit logs`
 
     if (Capacitor.isNativePlatform()) {
-      // Write to app Cache (no permissions, simple file I/O — avoids MediaStore crashes).
-      // Share.share opens Android share sheet; user taps Save to Files or Drive to keep it.
-      const result = await Filesystem.writeFile({
-        path:      name,
-        data:      json,
-        directory: Directory.Cache,
-        encoding:  Encoding.UTF8,
+      // Use the custom FileExport plugin (pure Java, no ionfilesystemlib).
+      // It writes the file and opens the Android share sheet in one call.
+      await FileExport.writeAndShare({
+        filename:    name,
+        data:        json,
+        dialogTitle: 'Save to Files, Drive or email',
       })
-      try {
-        await Share.share({
-          title:       'Life Log Backup',
-          url:         result.uri,
-          dialogTitle: 'Save to Files, Drive or email',
-        })
-      } catch (e) {
-        // Share cancelled/dismissed — not a failure, file was written
-        const msg = (e?.message ?? '').toLowerCase()
-        if (!msg.includes('cancel') && !msg.includes('dismiss') && !msg.includes('progress')) {
-          throw e
-        }
-      }
-      setTimeout(() => {
-        Filesystem.deleteFile({ path: name, directory: Directory.Cache }).catch(() => {})
-      }, 60000)
     } else {
       // Web browser: create a download link and click it.
       // navigator.share() is not used because the user-gesture context is
