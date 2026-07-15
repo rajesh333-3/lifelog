@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Dexie from 'dexie'
+import { Capacitor } from '@capacitor/core'
+import { Filesystem, Directory } from '@capacitor/filesystem'
+import { Share } from '@capacitor/share'
 import { useSettingsStore } from '../../store/useSettingsStore'
 import { useLLM } from '../AIChat/useLLM'
 import { db as lifeDB, getHabits, saveHabits } from '../../db'
@@ -664,21 +667,43 @@ function DataSection() {
       habitLogs:  await lifeDB.habitLogs.toArray(),
       chatLogs:   await lifeDB.chatLogs.toArray(),
     }
-    const json = JSON.stringify(payload, null, 2)
-    const blob = new Blob([json], { type: 'application/json' })
-    const name = `lifelog-backup-${ts}.json`
-    const file = new File([blob], name, { type: 'application/json' })
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'Life Log Backup' })
+    const json    = JSON.stringify(payload, null, 2)
+    const name    = `lifelog-backup-${ts}.json`
+    const summary = `${payload.days.length} days · ${payload.todos.length} tasks · ${payload.habitLogs.length} habit logs`
+
+    if (Capacitor.isNativePlatform()) {
+      // Write to app cache dir then open Android/iOS native share sheet
+      const result = await Filesystem.writeFile({
+        path:      name,
+        data:      json,
+        directory: Directory.Cache,
+        encoding:  'utf8',
+      })
+      await Share.share({
+        title:       'Life Log Backup',
+        text:        `Life Log backup — ${summary}`,
+        url:         result.uri,
+        dialogTitle: 'Save your Life Log backup',
+      })
+      // Clean up the cached file after sharing
+      await Filesystem.deleteFile({ path: name, directory: Directory.Cache }).catch(() => {})
     } else {
-      const url = URL.createObjectURL(blob)
-      const a   = document.createElement('a')
-      a.href     = url
-      a.download = name
-      a.click()
-      setTimeout(() => URL.revokeObjectURL(url), 3000)
+      // Web browser fallback
+      const blob = new Blob([json], { type: 'application/json' })
+      const file = new File([blob], name, { type: 'application/json' })
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Life Log Backup' })
+      } else {
+        const url = URL.createObjectURL(blob)
+        const a   = document.createElement('a')
+        a.href     = url
+        a.download = name
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 3000)
+      }
     }
-    return `${payload.days.length} days · ${payload.todos.length} tasks · ${payload.habitLogs.length} habit logs`
+
+    return summary
   }
 
   async function exportData() {
