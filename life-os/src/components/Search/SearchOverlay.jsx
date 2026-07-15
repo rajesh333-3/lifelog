@@ -7,6 +7,7 @@ export function SearchOverlay({ onClose, onSelectDate }) {
   const [query,   setQuery]   = useState('')
   const [results, setResults] = useState([])
   const [status,  setStatus]  = useState('idle') // 'idle' | 'searching' | 'done'
+  const [focused, setFocused] = useState(false)
   const inputRef  = useRef(null)
   const timerRef  = useRef(null)
 
@@ -56,18 +57,36 @@ export function SearchOverlay({ onClose, onSelectDate }) {
           </svg>
         </button>
 
-        <div className="flex-1 flex items-center gap-2.5 bg-[#141414] border border-[#242424] rounded-2xl px-3.5 py-2.5">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" className="shrink-0">
-            <circle cx="6.5" cy="6.5" r="4.5" stroke="#484848" strokeWidth="1.4"/>
-            <path d="M10 10l3 3" stroke="#484848" strokeWidth="1.4" strokeLinecap="round"/>
-          </svg>
+        <motion.div
+          className="flex-1 flex items-center gap-2.5 bg-[#141414] rounded-2xl px-3.5 py-2.5"
+          animate={{
+            boxShadow: focused
+              ? '0 0 0 2.5px rgba(167,139,250,0.25), 0 0 20px rgba(167,139,250,0.1)'
+              : '0 0 0 0px transparent',
+            borderColor: focused ? 'rgba(167,139,250,0.4)' : '#242424',
+          }}
+          style={{ border: '1px solid #242424' }}
+          transition={{ duration: 0.18 }}
+        >
+          <motion.div
+            className="shrink-0"
+            animate={!focused && !query ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+            transition={{ duration: 2.2, repeat: !focused && !query ? Infinity : 0, ease: 'easeInOut' }}
+          >
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <circle cx="6.5" cy="6.5" r="4.5" stroke="#484848" strokeWidth="1.4"/>
+              <path d="M10 10l3 3" stroke="#484848" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+          </motion.div>
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={handleChange}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder="Search your journey…"
-            className="flex-1 bg-transparent text-[#e0e0e0] text-sm placeholder:text-[#333] focus:outline-none"
+            className="flex-1 bg-transparent text-[#e0e0e0] text-sm placeholder:text-[#555] focus:outline-none"
           />
           {query.length > 0 && (
             <button
@@ -79,7 +98,7 @@ export function SearchOverlay({ onClose, onSelectDate }) {
               </svg>
             </button>
           )}
-        </div>
+        </motion.div>
 
         {status === 'searching' && (
           <div className="w-4 h-4 rounded-full border-2 border-[#a78bfa] border-t-transparent animate-spin shrink-0" />

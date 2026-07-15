@@ -102,7 +102,7 @@ function Card({ children, className = '' }) {
 function CardRow({ label, children }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3.5 last:border-0" style={{ borderBottom: '1px solid #1e1e1e' }}>
-      <span className="text-[#555] text-xs w-24 shrink-0">{label}</span>
+      <span className="text-[#888] text-xs w-24 shrink-0">{label}</span>
       <div className="flex-1 flex justify-end">{children}</div>
     </div>
   )
@@ -118,8 +118,8 @@ function Field({ value, onChange, type = 'text', placeholder, min, max }) {
       placeholder={placeholder}
       min={min}
       max={max}
-      className="rounded-xl px-3 py-2.5 text-sm text-[#e0e0e0] text-right placeholder:text-[#383838] focus:outline-none w-full transition-colors"
-      style={{ background: '#1c1c1c', border: '1px solid #2e2e2e' }}
+      className="rounded-xl px-3 py-2.5 text-sm text-[#e0e0e0] text-left placeholder:text-[#555] focus:outline-none w-full transition-colors"
+      style={{ background: '#1c1c1c', border: '1px solid #2e2e2e', textAlign: 'left' }}
       onFocus={e => e.target.style.borderColor = 'rgba(167,139,250,0.5)'}
       onBlur={e => e.target.style.borderColor = '#2e2e2e'}
     />

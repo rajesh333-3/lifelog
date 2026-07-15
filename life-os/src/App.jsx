@@ -38,6 +38,12 @@ export default function App() {
   const [showTour,    setShowTour]    = useState(false)
   const [showSearch,  setShowSearch]  = useState(false)
   const [calOpen,     setCalOpen]     = useState(false)
+  const [splashDone,  setSplashDone]  = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setSplashDone(true), 1600)
+    return () => clearTimeout(t)
+  }, [])
 
   const openDayView  = useAppStore(s => s.openDayView)
   const selectedDate = useAppStore(s => s.selectedDate)
@@ -75,29 +81,24 @@ export default function App() {
 
   if (!loaded) {
     return (
-      <div className="min-h-dvh bg-[#0a0a0a] flex flex-col items-center justify-center gap-6 px-8">
-        <div className="w-2 h-2 rounded-full bg-[#a78bfa] animate-ping" />
-        <p style={{
-          fontFamily:    "'Outfit', system-ui, sans-serif",
-          fontSize:      15,
-          fontWeight:    300,
-          fontStyle:     'italic',
-          color:         '#303030',
-          textAlign:     'center',
-          lineHeight:    1.6,
-          letterSpacing: '-0.1px',
-        }}>
-          {LOADING_QUOTES[Math.floor(Math.random() * LOADING_QUOTES.length)]}
-        </p>
-      </div>
+      <>
+        <div className="min-h-dvh bg-[#0a0a0a]" />
+        <AnimatePresence>{!splashDone && <SplashScreen />}</AnimatePresence>
+      </>
     )
   }
 
   if (!profile) {
-    return <Onboarding onComplete={load} />
+    return (
+      <>
+        <Onboarding onComplete={load} />
+        <AnimatePresence>{!splashDone && <SplashScreen />}</AnimatePresence>
+      </>
+    )
   }
 
   return (
+    <>
     <div className="min-h-dvh bg-[#0a0a0a] flex flex-col select-none">
       <Header profile={profile} onReplayTour={() => setShowTour(true)} onSearch={() => setShowSearch(true)} />
 
@@ -113,6 +114,9 @@ export default function App() {
             <TabPanel key="grid" dir={tabDirRef.current}>
               <div className="relative h-full">
                 <LifeGrid dob={profile.dob} lifeExpectancy={profile.lifeExpectancy} />
+                <div className="absolute top-3 left-3 z-10 pointer-events-none">
+                  <TodayPill />
+                </div>
                 {profile?.dob && (
                   <div className="absolute top-3 right-3 z-10 pointer-events-auto">
                     <CalendarTrigger dob={profile.dob} onOpen={() => setCalOpen(true)} />
@@ -171,6 +175,8 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+    <AnimatePresence>{!splashDone && <SplashScreen />}</AnimatePresence>
+    </>
   )
 }
 
@@ -421,6 +427,115 @@ function ComingSoon({ tab }) {
       <p className="text-[#f0f0f0] text-xl font-light">{title}</p>
       <p className="text-[#444] text-sm text-center">{sub}</p>
     </div>
+  )
+}
+
+/* ── Today pill (grid tab top-left) ── */
+function TodayPill() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  return (
+    <div style={{
+      display:       'flex',
+      alignItems:    'center',
+      gap:           6,
+      background:    'rgba(255,255,255,0.04)',
+      border:        '1px solid rgba(255,255,255,0.08)',
+      borderRadius:  10,
+      padding:       '5px 9px',
+    }}>
+      <span style={{ fontSize: 10, fontWeight: 600, color: '#888', letterSpacing: '-0.2px', lineHeight: 1 }}>
+        {dateStr}
+      </span>
+      <div style={{ width: 1, height: 10, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+      <span style={{ fontSize: 10, fontWeight: 700, color: '#a78bfa', letterSpacing: '-0.3px', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+        {timeStr}
+      </span>
+    </div>
+  )
+}
+
+/* ── Splash screen ── */
+function SplashScreen() {
+  return (
+    <motion.div
+      className="fixed inset-0 flex flex-col items-center justify-center bg-[#0a0a0a]"
+      style={{ zIndex: 200 }}
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 1.04 }}
+      transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
+    >
+      {/* Logo */}
+      <motion.img
+        src="/icons/icon-192.png"
+        alt="Life Log"
+        initial={{ scale: 0.38, opacity: 0 }}
+        animate={{ scale: 1,    opacity: 1 }}
+        transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
+        style={{
+          width:        88,
+          height:       88,
+          borderRadius: 24,
+          boxShadow:    '0 0 0 1px rgba(167,139,250,0.22), 0 12px 48px rgba(167,139,250,0.4)',
+        }}
+      />
+
+      {/* Brand */}
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.38, ease: 'easeOut' }}
+        style={{ marginTop: 22, textAlign: 'center' }}
+      >
+        <span style={{
+          fontFamily:    "'Outfit', system-ui, sans-serif",
+          fontSize:      30,
+          fontWeight:    800,
+          color:         '#f0f0f0',
+          letterSpacing: '-1.2px',
+          lineHeight:    1,
+          display:       'block',
+        }}>
+          Life Log
+        </span>
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.4 }}
+          transition={{ duration: 0.45, delay: 0.65 }}
+          style={{
+            display:       'block',
+            marginTop:     7,
+            fontSize:      12,
+            color:         '#a78bfa',
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            fontWeight:    500,
+          }}
+        >
+          Live intentionally
+        </motion.span>
+      </motion.div>
+
+      {/* Subtle progress line */}
+      <motion.div
+        initial={{ scaleX: 0, opacity: 0 }}
+        animate={{ scaleX: 1, opacity: 0.35 }}
+        transition={{ duration: 1.4, delay: 0.2, ease: 'easeInOut' }}
+        style={{
+          position:        'absolute',
+          bottom:          '18%',
+          width:           80,
+          height:          1.5,
+          background:      'linear-gradient(90deg, transparent, #a78bfa, transparent)',
+          transformOrigin: 'left',
+        }}
+      />
+    </motion.div>
   )
 }
 

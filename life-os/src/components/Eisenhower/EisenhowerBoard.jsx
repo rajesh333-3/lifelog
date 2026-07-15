@@ -117,9 +117,9 @@ export function EisenhowerBoard() {
           <AddTaskButton />
         </div>
 
-        {/* Quadrant grid */}
-        <div className="flex-1 overflow-y-auto no-scrollbar">
-          <div className="grid grid-cols-2 gap-2 p-3 pb-6">
+        {/* Quadrant grid — fills full available height */}
+        <div className="flex-1 min-h-0 p-3 pb-4">
+          <div className="grid grid-cols-2 grid-rows-2 gap-2 h-full">
             {QUADRANTS.map(q => (
               <QuadrantColumn
                 key={q.id}
@@ -128,14 +128,6 @@ export function EisenhowerBoard() {
               />
             ))}
           </div>
-
-          {totalOpen === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <span className="text-2xl">✓</span>
-              <p className="text-[#666] text-sm">No open tasks</p>
-              <p className="text-[#555] text-xs">Create one above or from any day</p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -184,7 +176,7 @@ function QuadrantColumn({ quadrant, tasks }) {
       <div className="h-px mx-3" style={{ background: border }} />
 
       {/* Task list */}
-      <div className="flex flex-col gap-1.5 p-2 flex-1">
+      <div className="flex flex-col gap-1.5 p-2 flex-1 overflow-y-auto no-scrollbar min-h-0">
         <AnimatePresence initial={false}>
           {tasks.map(task => (
             <BoardTaskRow key={task.id} task={task} accentColor={color} />
@@ -355,7 +347,7 @@ function AddTaskButton() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && add()}
               placeholder="What needs to be done?"
-              className="bg-transparent text-[#f0f0f0] text-sm placeholder:text-[#333] focus:outline-none w-full"
+              className="bg-transparent text-[#f0f0f0] text-sm placeholder:text-[#555] focus:outline-none w-full"
             />
 
             {/* Toggles */}

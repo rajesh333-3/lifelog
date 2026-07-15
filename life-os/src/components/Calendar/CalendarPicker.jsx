@@ -61,14 +61,14 @@ export function CalendarTrigger({ dob, onOpen }) {
     >
       {/* Calendar icon */}
       <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-        <rect x="1" y="2.5" width="10" height="8.5" rx="2" stroke={isHovering ? '#a78bfa' : '#555'} strokeWidth="1.2"/>
-        <path d="M4 1v3M8 1v3" stroke={isHovering ? '#a78bfa' : '#555'} strokeWidth="1.2" strokeLinecap="round"/>
-        <path d="M1 5.5h10" stroke={isHovering ? '#a78bfa' : '#555'} strokeWidth="1.2"/>
+        <rect x="1" y="2.5" width="10" height="8.5" rx="2" stroke={isHovering ? '#a78bfa' : '#999'} strokeWidth="1.2"/>
+        <path d="M4 1v3M8 1v3" stroke={isHovering ? '#a78bfa' : '#999'} strokeWidth="1.2" strokeLinecap="round"/>
+        <path d="M1 5.5h10" stroke={isHovering ? '#a78bfa' : '#999'} strokeWidth="1.2"/>
       </svg>
       <span style={{
         fontSize:            10,
         fontWeight:          600,
-        color:               isHovering ? '#a78bfa' : '#555',
+        color:               isHovering ? '#a78bfa' : '#999',
         fontVariantNumeric:  'tabular-nums',
         letterSpacing:       '-0.2px',
         lineHeight:          1,
