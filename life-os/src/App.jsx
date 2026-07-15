@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useSettingsStore } from './store/useSettingsStore'
 import { useAppStore } from './store/useAppStore'
@@ -34,6 +34,7 @@ const NAV = [
 export default function App() {
   const { profile, loaded, load } = useSettingsStore()
   const [activeTab,   setActiveTab]   = useState('grid')
+  const [tabDir,      setTabDir]      = useState(0)
   const [showTour,    setShowTour]    = useState(false)
   const [showSearch,  setShowSearch]  = useState(false)
   const [calOpen,     setCalOpen]     = useState(false)
@@ -42,6 +43,18 @@ export default function App() {
   const selectedDate = useAppStore(s => s.selectedDate)
   const activePanel  = useAppStore(s => s.activePanel)
   const closePanel   = useAppStore(s => s.closePanel)
+
+  const prevTabRef = useRef(activeTab)
+  const tabDirRef  = useRef(0)
+  const handleTabChange = (tab) => {
+    const prev = prevTabRef.current
+    const prevIdx = NAV.findIndex(n => n.id === prev)
+    const nextIdx = NAV.findIndex(n => n.id === tab)
+    tabDirRef.current = nextIdx > prevIdx ? 1 : -1
+    prevTabRef.current = tab
+    closePanel()
+    setActiveTab(tab)
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -97,48 +110,46 @@ export default function App() {
       <main className="flex-1 overflow-hidden relative">
         <AnimatePresence mode="wait">
           {activeTab === 'grid' && (
-            <TabPanel key="grid">
-              <div className="h-full flex flex-col overflow-hidden px-3 py-3">
+            <TabPanel key="grid" dir={tabDirRef.current}>
+              <div className="relative h-full">
+                <LifeGrid dob={profile.dob} lifeExpectancy={profile.lifeExpectancy} />
                 {profile?.dob && (
-                  <div className="flex justify-end mb-2 px-1 shrink-0">
+                  <div className="absolute top-3 right-3 z-10 pointer-events-auto">
                     <CalendarTrigger dob={profile.dob} onOpen={() => setCalOpen(true)} />
                   </div>
                 )}
-                <div className="flex-1 min-h-0">
-                  <LifeGrid dob={profile.dob} lifeExpectancy={profile.lifeExpectancy} />
-                </div>
               </div>
             </TabPanel>
           )}
           {activeTab === 'today' && (
-            <TabPanel key="today">
+            <TabPanel key="today" dir={tabDirRef.current}>
               <DayView initialDate={todayStr()} />
             </TabPanel>
           )}
           {activeTab === 'ai' && (
-            <TabPanel key="ai">
+            <TabPanel key="ai" dir={tabDirRef.current}>
               <InsightsView />
             </TabPanel>
           )}
           {activeTab === 'tasks' && (
-            <TabPanel key="tasks">
+            <TabPanel key="tasks" dir={tabDirRef.current}>
               <EisenhowerBoard />
             </TabPanel>
           )}
           {activeTab === 'settings' && (
-            <TabPanel key="settings">
+            <TabPanel key="settings" dir={tabDirRef.current}>
               <Settings onReplayTour={() => setShowTour(true)} />
             </TabPanel>
           )}
           {activeTab !== 'grid' && activeTab !== 'today' && activeTab !== 'ai' && activeTab !== 'tasks' && activeTab !== 'settings' && (
-            <TabPanel key={activeTab}>
+            <TabPanel key={activeTab} dir={tabDirRef.current}>
               <ComingSoon tab={activeTab} />
             </TabPanel>
           )}
         </AnimatePresence>
       </main>
 
-      <BottomNav active={activeTab} onChange={(tab) => { closePanel(); setActiveTab(tab) }} />
+      <BottomNav active={activeTab} onChange={handleTabChange} />
 
       {/* DayView overlay — opened from grid dot tap or search result */}
       <AnimatePresence>
@@ -353,12 +364,24 @@ function BottomNav({ active, onChange }) {
           <button
             key={id}
             onClick={() => onChange(id)}
-            className="flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] active:scale-95 transition-transform duration-100"
+            className="relative flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-transform duration-100 active:scale-90"
           >
+            {/* Sliding active pill */}
+            {isActive && (
+              <motion.div
+                layoutId="nav-pill"
+                className="absolute inset-x-2 inset-y-1.5 rounded-xl pointer-events-none"
+                style={{
+                  background: 'rgba(167,139,250,0.1)',
+                  border:     '1px solid rgba(167,139,250,0.2)',
+                }}
+                transition={{ type: 'spring', stiffness: 440, damping: 38 }}
+              />
+            )}
             <Icon active={isActive} />
             <span
               className="text-[9px] uppercase tracking-widest font-semibold transition-colors duration-150"
-              style={{ color: isActive ? '#a78bfa' : '#707070' }}
+              style={{ color: isActive ? '#a78bfa' : '#666' }}
             >
               {label}
             </span>
@@ -370,14 +393,15 @@ function BottomNav({ active, onChange }) {
 }
 
 /* ── Tab panel wrapper ── */
-function TabPanel({ children }) {
+function TabPanel({ children, dir = 0 }) {
+  const x = dir * 28  // slide 28px in the direction of travel
   return (
     <motion.div
       className="absolute inset-0"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
+      initial={{ opacity: 0, x }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -x }}
+      transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
     >
       {children}
     </motion.div>
