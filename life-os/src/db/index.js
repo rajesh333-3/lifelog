@@ -72,6 +72,7 @@ export async function tasksForDate(date) {
   return all.filter(t => {
     const created = t.createdDate ?? t.date   // backward compat
     if (!created || created > date) return false
+    if (t.source === 'commitment') return true // always visible — reset each day
     if (!t.done) return true
     return t.completedDate === date            // show completion on the day it was closed
   })

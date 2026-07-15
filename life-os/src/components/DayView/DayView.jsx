@@ -55,10 +55,14 @@ export function DayView({ initialDate, asOverlay = false }) {
   const taskScores = useMemo(() => {
     const score = (p) => {
       const pt = allTasks.filter(t => pillarOf(t) === p)
-      return pt.length ? Math.round(pt.filter(t => t.done).length / pt.length * 100) : null
+      if (!pt.length) return null
+      const doneCount = pt.filter(t =>
+        t.source === 'commitment' ? t.completedDate === date : t.done
+      ).length
+      return Math.round(doneCount / pt.length * 100)
     }
     return { physical: score('physical'), mental: score('mental'), work: score('work') }
-  }, [allTasks])
+  }, [allTasks, date])
 
   // Ref so the score-sync effect can read latest local without a stale closure
   const localRef = useRef(local)

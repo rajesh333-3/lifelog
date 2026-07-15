@@ -34,6 +34,19 @@ function toQuadrant(urgent, important) {
   return 'Q4'
 }
 
+// Commitment tasks reset daily — done state is per-day via completedDate, not done flag
+function isDoneOn(task, date) {
+  return task.source === 'commitment' ? task.completedDate === date : task.done
+}
+
+// How many days a user task has been rolling over (0 = added today, 1+ = carrying forward)
+function pendingDays(task, date) {
+  if (task.source === 'commitment' || !task.createdDate) return 0
+  const created = new Date(task.createdDate + 'T00:00:00')
+  const current = new Date(date + 'T00:00:00')
+  return Math.max(0, Math.floor((current - created) / 86400000))
+}
+
 export function TaskSection({ date, futureOnly, readOnly }) {
   const [input,     setInput]     = useState('')
   const [dueDate,   setDueDate]   = useState(date)
@@ -66,11 +79,17 @@ export function TaskSection({ date, futureOnly, readOnly }) {
     setAdding(false)
   }
 
-  async function toggleDone(id, done) {
-    await db.todos.update(id, {
-      done:          !done,
-      completedDate: !done ? todayStr() : null,
-    })
+  async function toggleDone(task) {
+    if (task.source === 'commitment') {
+      // Per-day completion: only track completedDate; done stays false so it reappears tomorrow
+      const doneToday = task.completedDate === date
+      await db.todos.update(task.id, { completedDate: doneToday ? null : date })
+    } else {
+      await db.todos.update(task.id, {
+        done:          !task.done,
+        completedDate: !task.done ? todayStr() : null,
+      })
+    }
   }
 
   async function updateTask(id, patch) {
@@ -97,14 +116,14 @@ export function TaskSection({ date, futureOnly, readOnly }) {
       {PILLARS.map(p => {
         const cfg       = PILLAR_CONFIG[p]
         const all       = byPillar[p]
-        const doneCount = all.filter(t => t.done).length
+        const doneCount = all.filter(t => isDoneOn(t, date)).length
         const total     = all.length
         if (total === 0 && readOnly) return null
         if (total === 0) return null
         const pct       = total === 0 ? 0 : Math.round((doneCount / total) * 100)
         const complete  = total > 0 && doneCount === total
-        const open      = all.filter(t => !t.done)
-        const done      = all.filter(t => t.done)
+        const open      = all.filter(t => !isDoneOn(t, date))
+        const done      = all.filter(t => isDoneOn(t, date))
 
         return (
           <div key={p} className="flex flex-col gap-1.5">
@@ -135,8 +154,8 @@ export function TaskSection({ date, futureOnly, readOnly }) {
             {/* Open tasks */}
             <AnimatePresence initial={false}>
               {open.map(task => (
-                <TaskRow key={task.id} task={task}
-                  onToggle={readOnly ? null : toggleDone}
+                <TaskRow key={task.id} task={task} isDone={false} pending={pendingDays(task, date)}
+                  onToggle={readOnly ? null : () => toggleDone(task)}
                   onUpdate={task.source === 'commitment' ? null : (readOnly ? null : updateTask)}
                   onDelete={task.source === 'commitment' ? null : (readOnly ? null : deleteTask)} />
               ))}
@@ -152,8 +171,8 @@ export function TaskSection({ date, futureOnly, readOnly }) {
                 <div className="mt-1 flex flex-col gap-1.5">
                   <AnimatePresence initial={false}>
                     {done.map(task => (
-                      <TaskRow key={task.id} task={task}
-                        onToggle={readOnly ? null : toggleDone}
+                      <TaskRow key={task.id} task={task} isDone={true} pending={pendingDays(task, date)}
+                        onToggle={readOnly ? null : () => toggleDone(task)}
                         onUpdate={task.source === 'commitment' ? null : (readOnly ? null : updateTask)}
                         onDelete={task.source === 'commitment' ? null : (readOnly ? null : deleteTask)}
                         faded />
@@ -280,7 +299,7 @@ export function TaskSection({ date, futureOnly, readOnly }) {
 }
 
 /* ── Task row ── */
-function TaskRow({ task, onToggle, onUpdate, onDelete, faded }) {
+function TaskRow({ task, isDone, pending = 0, onToggle, onUpdate, onDelete, faded }) {
   const [editing,   setEditing]   = useState(false)
   const [editTitle, setEditTitle] = useState(task.title)
   const [editUrg,   setEditUrg]   = useState(task.urgent    ?? false)
@@ -358,11 +377,11 @@ function TaskRow({ task, onToggle, onUpdate, onDelete, faded }) {
       {/* Checkbox */}
       {onToggle ? (
         <button
-          onClick={() => onToggle(task.id, task.done)}
+          onClick={onToggle}
           className="w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all active:scale-90"
-          style={{ borderColor: task.done ? '#4ade80' : priority.color + '66', background: task.done ? '#4ade8022' : 'transparent' }}
+          style={{ borderColor: isDone ? '#4ade80' : priority.color + '66', background: isDone ? '#4ade8022' : 'transparent' }}
         >
-          {task.done && (
+          {isDone && (
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M2 5l2 2 4-4" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
@@ -370,8 +389,8 @@ function TaskRow({ task, onToggle, onUpdate, onDelete, faded }) {
         </button>
       ) : (
         <div className="w-5 h-5 rounded-full border shrink-0 flex items-center justify-center"
-          style={{ borderColor: task.done ? '#4ade80' : '#2a2a2a' }}>
-          {task.done && (
+          style={{ borderColor: isDone ? '#4ade80' : '#2a2a2a' }}>
+          {isDone && (
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M2 5l2 2 4-4" stroke="#4ade80" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
@@ -379,13 +398,20 @@ function TaskRow({ task, onToggle, onUpdate, onDelete, faded }) {
         </div>
       )}
 
-      {/* Title */}
-      <span className={`flex-1 text-sm leading-snug ${task.done ? 'line-through text-[#333]' : 'text-[#e0e0e0]'}`}>
-        {task.source === 'commitment' && (
-          <span className="text-[10px] text-[#444] mr-1.5 font-medium uppercase tracking-wider">commitment</span>
+      {/* Title + pending indicator */}
+      <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+        <span className={`text-sm leading-snug ${isDone ? 'line-through text-[#333]' : 'text-[#e0e0e0]'}`}>
+          {task.source === 'commitment' && (
+            <span className="text-[10px] text-[#444] mr-1.5 font-medium uppercase tracking-wider">commitment</span>
+          )}
+          {task.title}
+        </span>
+        {pending > 0 && !isDone && (
+          <span className="text-[10px] font-medium" style={{ color: pending >= 7 ? '#f87171' : pending >= 3 ? '#fb923c' : '#888' }}>
+            ↻ {pending} day{pending !== 1 ? 's' : ''} pending
+          </span>
         )}
-        {task.title}
-      </span>
+      </div>
 
       {/* Priority badge */}
       <span
@@ -396,7 +422,7 @@ function TaskRow({ task, onToggle, onUpdate, onDelete, faded }) {
       </span>
 
       {/* Edit */}
-      {onUpdate && !task.done && (
+      {onUpdate && !isDone && (
         <button
           onClick={startEdit}
           className="opacity-0 group-hover:opacity-100 text-[#2a2a2a] hover:text-[#a78bfa] transition-all w-6 h-6 flex items-center justify-center rounded shrink-0"
