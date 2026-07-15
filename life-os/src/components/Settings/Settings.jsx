@@ -672,45 +672,28 @@ function DataSection() {
     const summary = `${payload.days.length} days · ${payload.todos.length} tasks · ${payload.habitLogs.length} habit logs`
 
     if (Capacitor.isNativePlatform()) {
-      // Write to app cache dir then open Android/iOS native share sheet.
-      // Use files[] (not url:) so Share sets the correct MIME type and grants
-      // URI permissions properly. Don't delete the cache file until after the
-      // share resolves — async upload targets (Drive, etc.) may still be reading.
-      const result = await Filesystem.writeFile({
+      // Write to Documents — shows up in the Files app under Documents.
+      // On Android 10+ no permission needed (MediaStore). On older Android
+      // WRITE_EXTERNAL_STORAGE in the manifest covers it.
+      await Filesystem.writeFile({
         path:      name,
         data:      json,
-        directory: Directory.Cache,
+        directory: Directory.Documents,
         encoding:  Encoding.UTF8,
       })
-      try {
-        await Share.share({
-          title:       'Life Log Backup',
-          files:       [result.uri],
-          dialogTitle: 'Save your Life Log backup',
-        })
-      } catch (shareErr) {
-        // "Share canceled" / user dismissed the sheet — not a fatal error
-        const msg = (shareErr?.message ?? String(shareErr)).toLowerCase()
-        if (!msg.includes('cancel') && !msg.includes('dismiss')) throw shareErr
-      }
-      // Cleanup after a short delay so uploaders have time to read the stream
-      setTimeout(() => {
-        Filesystem.deleteFile({ path: name, directory: Directory.Cache }).catch(() => {})
-      }, 5000)
     } else {
-      // Web browser fallback
+      // Web browser: create a download link and click it.
+      // navigator.share() is not used because the user-gesture context is
+      // lost after the async DB reads, causing NotAllowedError in most browsers.
       const blob = new Blob([json], { type: 'application/json' })
-      const file = new File([blob], name, { type: 'application/json' })
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Life Log Backup' })
-      } else {
-        const url = URL.createObjectURL(blob)
-        const a   = document.createElement('a')
-        a.href     = url
-        a.download = name
-        a.click()
-        setTimeout(() => URL.revokeObjectURL(url), 3000)
-      }
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 3000)
     }
 
     return summary
@@ -722,7 +705,7 @@ function DataSection() {
       const summary = await buildAndShareExport()
       setExportSummary(summary)
       setExportState('done')
-      setTimeout(() => setExportState('idle'), 3000)
+      setTimeout(() => setExportState('idle'), 6000)
     } catch {
       setExportState('error')
       setTimeout(() => setExportState('idle'), 3000)
@@ -825,12 +808,17 @@ function DataSection() {
             style={{ background: '#a78bfa18', border: '1px solid #a78bfa33', color: '#a78bfa' }}
           >
             {exportState === 'exporting' ? 'Exporting…'
-              : exportState === 'done'      ? '✓ Exported'
+              : exportState === 'done'      ? '✓ Saved to Documents'
               : exportState === 'error'     ? 'Export failed — try again'
               : 'Export data'}
           </button>
           {exportState === 'done' && exportSummary && (
-            <p className="text-[10px] text-center" style={{ color: '#686868' }}>{exportSummary}</p>
+            <div className="flex flex-col gap-0.5">
+              <p className="text-[10px] text-center" style={{ color: '#4ade80' }}>
+                {Capacitor.isNativePlatform() ? 'Find it in Files → Documents' : 'Check your Downloads folder'}
+              </p>
+              <p className="text-[10px] text-center" style={{ color: '#686868' }}>{exportSummary}</p>
+            </div>
           )}
         </div>
       </div>
