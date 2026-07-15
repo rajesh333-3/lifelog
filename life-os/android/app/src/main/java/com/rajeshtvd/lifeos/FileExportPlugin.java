@@ -51,7 +51,7 @@ public class FileExportPlugin extends Plugin {
 
             // Build a clean ACTION_SEND intent for the JSON file.
             Intent send = new Intent(Intent.ACTION_SEND);
-            send.setType("application/json");
+            send.setType("*/*");
             send.putExtra(Intent.EXTRA_STREAM, contentUri);
             send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
