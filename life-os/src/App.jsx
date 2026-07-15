@@ -41,7 +41,7 @@ export default function App() {
   const [splashDone,  setSplashDone]  = useState(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setSplashDone(true), 1600)
+    const t = setTimeout(() => setSplashDone(true), 2600)
     return () => clearTimeout(t)
   }, [])
 
@@ -474,14 +474,14 @@ function SplashScreen() {
       <motion.img
         src="/icons/icon-192.png"
         alt="Life Log"
-        initial={{ scale: 0.38, opacity: 0 }}
-        animate={{ scale: 1,    opacity: 1 }}
-        transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
+        initial={{ scale: 0.3, opacity: 0 }}
+        animate={{ scale: 1,   opacity: 1 }}
+        transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
         style={{
-          width:        88,
-          height:       88,
-          borderRadius: 24,
-          boxShadow:    '0 0 0 1px rgba(167,139,250,0.22), 0 12px 48px rgba(167,139,250,0.4)',
+          width:        128,
+          height:       128,
+          borderRadius: 30,
+          boxShadow:    '0 0 0 1.5px rgba(167,139,250,0.28), 0 16px 64px rgba(167,139,250,0.5)',
         }}
       />
 
@@ -490,7 +490,7 @@ function SplashScreen() {
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.38, ease: 'easeOut' }}
-        style={{ marginTop: 22, textAlign: 'center' }}
+        style={{ marginTop: 28, textAlign: 'center' }}
       >
         <span style={{
           fontFamily:    "'Outfit', system-ui, sans-serif",
@@ -525,7 +525,7 @@ function SplashScreen() {
       <motion.div
         initial={{ scaleX: 0, opacity: 0 }}
         animate={{ scaleX: 1, opacity: 0.35 }}
-        transition={{ duration: 1.4, delay: 0.2, ease: 'easeInOut' }}
+        transition={{ duration: 2.2, delay: 0.25, ease: 'easeInOut' }}
         style={{
           position:        'absolute',
           bottom:          '18%',
