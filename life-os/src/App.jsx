@@ -182,16 +182,18 @@ export default function App() {
 
 /* ── Search hint data ── */
 const SEARCH_HINTS = [
-  { text: 'great gym session…',      color: '#4ade80' },
-  { text: 'felt anxious today…',     color: '#f87171' },
-  { text: 'productive deep work…',   color: '#a78bfa' },
-  { text: 'coffee with a friend…',   color: '#60a5fa' },
-  { text: "couldn't sleep well…",    color: '#fbbf24' },
-  { text: 'meditation morning…',     color: '#34d399' },
-  { text: 'hit my goal today…',      color: '#4ade80' },
-  { text: 'rough week overall…',     color: '#f97316' },
-  { text: 'cleared my task list…',   color: '#a78bfa' },
-  { text: 'journaled about stress…', color: '#fb7185' },
+  { text: 'when did i go meet John…',              color: '#60a5fa' },
+  { text: 'that night we played hockey so late…',  color: '#34d399' },
+  { text: 'felt sad when my puppy fell sick…',     color: '#f87171' },
+  { text: 'the day i first met…',                  color: '#c4b5fd' },
+  { text: 'that road trip we took last summer…',   color: '#fbbf24' },
+  { text: 'week everything started falling apart…',color: '#f97316' },
+  { text: 'morning i decided to change things…',   color: '#a78bfa' },
+  { text: 'birthday dinner with the whole team…',  color: '#4ade80' },
+  { text: 'cried but somehow felt better after…',  color: '#818cf8' },
+  { text: 'finally cracked that hard problem…',    color: '#34d399' },
+  { text: "couldn't sleep, kept overthinking…",    color: '#fb923c' },
+  { text: 'the day everything just clicked…',      color: '#4ade80' },
 ]
 
 /* ── Animated search bar ── */
